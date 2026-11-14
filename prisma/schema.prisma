@@ -1,0 +1,322 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USERS & AUTH ────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // bcrypt hash
+  name      String
+  role      UserRole @default(OFFICER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  borrowers Borrower[]
+  auditLogs AuditLog[]
+
+  @@index([email])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  OFFICER
+}
+
+// ─── BORROWERS ───────────────────────────────────────────────────
+
+model Borrower {
+  id           String   @id @default(uuid())
+  borrowerCode String   @unique
+  firstName    String
+  lastName     String
+  email        String?
+  phone        String
+  address      String?  @db.Text
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdById  String
+  createdBy    User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  loans Loan[]
+
+  @@index([borrowerCode])
+  @@index([createdById])
+  @@map("borrowers")
+}
+
+// ─── LOAN PRODUCTS ───────────────────────────────────────────────
+
+model LoanProduct {
+  id                    String   @id @default(uuid())
+  name                  String   @unique
+  description           String?  @db.Text
+  interestRateBps       Int      // Annual interest rate in basis points (1250 = 12.50%)
+  minTenureMonths       Int
+  maxTenureMonths       Int
+  minAmountPaise        BigInt   // Minimum loan amount in paise
+  maxAmountPaise        BigInt   // Maximum loan amount in paise
+  penaltyRateBps        Int      @default(0) // Late payment penalty in basis points
+  processingFeeBps      Int      @default(0) // Processing fee in basis points
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  loans Loan[]
+
+  @@map("loan_products")
+}
+
+// ─── LOANS ───────────────────────────────────────────────────────
+
+model Loan {
+  id                String     @id @default(uuid())
+  loanNumber        String     @unique
+  borrowerId        String
+  productId         String
+  principalPaise    BigInt     // Sanctioned principal in paise
+  interestRateBps   Int        // Applied rate (snapshot from product, may differ)
+  tenureMonths      Int
+  disbursedAt       DateTime?
+  closedAt          DateTime?
+  status            LoanStatus @default(PENDING)
+  version           Int        @default(1) // Optimistic locking
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  borrower          Borrower        @relation(fields: [borrowerId], references: [id], onDelete: Restrict)
+  product           LoanProduct     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  repaymentSchedule RepaymentSchedule[]
+  repayments        Repayment[]
+  ledgerAccounts    LedgerAccount[]
+  accrualRecords    AccrualRecord[]
+
+  @@index([loanNumber])
+  @@index([borrowerId])
+  @@index([status])
+  @@index([productId])
+  @@map("loans")
+}
+
+enum LoanStatus {
+  PENDING
+  ACTIVE
+  CLOSED
+  DEFAULTED
+  WRITTEN_OFF
+}
+
+// ─── REPAYMENT SCHEDULE ──────────────────────────────────────────
+
+model RepaymentSchedule {
+  id                String                 @id @default(uuid())
+  loanId            String
+  installmentNumber Int
+  dueDate           DateTime
+  principalPaise    BigInt                 // Expected principal component in paise
+  interestPaise     BigInt                 // Expected interest component in paise
+  totalPaise        BigInt                 // principalPaise + interestPaise
+  status            InstallmentStatus      @default(PENDING)
+  version           Int                    @default(1) // Optimistic locking
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  loan              Loan                   @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  allocations       RepaymentAllocation[]
+
+  @@unique([loanId, installmentNumber])
+  @@index([loanId, installmentNumber])
+  @@index([dueDate])
+  @@index([status])
+  @@map("repayment_schedules")
+}
+
+enum InstallmentStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+}
+
+// ─── REPAYMENTS ──────────────────────────────────────────────────
+
+model Repayment {
+  id               String              @id @default(uuid())
+  loanId           String
+  amountPaise      BigInt              // Total repayment amount in paise
+  paymentDate      DateTime
+  paymentMethod    PaymentMethod       @default(BANK_TRANSFER)
+  referenceNumber  String?
+  idempotencyKeyId String?             @unique
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  loan             Loan                @relation(fields: [loanId], references: [id], onDelete: Restrict)
+  idempotencyKey   IdempotencyKey?     @relation(fields: [idempotencyKeyId], references: [id])
+  allocations      RepaymentAllocation[]
+
+  @@index([loanId])
+  @@index([paymentDate])
+  @@map("repayments")
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  UPI
+  CHEQUE
+  AUTO_DEBIT
+}
+
+// ─── REPAYMENT ALLOCATION ────────────────────────────────────────
+
+model RepaymentAllocation {
+  id                  String            @id @default(uuid())
+  repaymentId         String
+  scheduleId          String
+  principalPaise      BigInt            // Principal portion allocated in paise
+  interestPaise       BigInt            // Interest portion allocated in paise
+  penaltyPaise        BigInt            @default(0) // Penalty portion in paise
+  createdAt           DateTime          @default(now())
+
+  repayment           Repayment         @relation(fields: [repaymentId], references: [id], onDelete: Cascade)
+  schedule            RepaymentSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@index([repaymentId])
+  @@index([scheduleId])
+  @@map("repayment_allocations")
+}
+
+// ─── LEDGER ──────────────────────────────────────────────────────
+
+model LedgerAccount {
+  id          String            @id @default(uuid())
+  name        String
+  accountType LedgerAccountType
+  loanId      String?
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  loan        Loan?             @relation(fields: [loanId], references: [id], onDelete: Restrict)
+  entries     LedgerEntry[]
+
+  @@index([accountType])
+  @@index([loanId])
+  @@map("ledger_accounts")
+}
+
+enum LedgerAccountType {
+  ASSET
+  LIABILITY
+  INCOME
+  EXPENSE
+  EQUITY
+}
+
+model LedgerTransaction {
+  id              String        @id @default(uuid())
+  transactionRef  String        @unique @default(uuid())
+  description     String        @db.Text
+  transactionDate DateTime
+  posted          Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+
+  entries         LedgerEntry[]
+
+  @@index([transactionDate])
+  @@index([posted])
+  @@map("ledger_transactions")
+}
+
+model LedgerEntry {
+  id                  String            @id @default(uuid())
+  ledgerTransactionId String
+  ledgerAccountId     String
+  entryType           EntryType
+  amountPaise         BigInt            // Amount in paise (always positive)
+  posted              Boolean           @default(false) // Immutable once true
+  createdAt           DateTime          @default(now())
+
+  transaction         LedgerTransaction @relation(fields: [ledgerTransactionId], references: [id], onDelete: Cascade)
+  account             LedgerAccount     @relation(fields: [ledgerAccountId], references: [id], onDelete: Restrict)
+
+  @@index([ledgerTransactionId])
+  @@index([ledgerAccountId])
+  @@index([posted])
+  @@map("ledger_entries")
+}
+
+enum EntryType {
+  DEBIT
+  CREDIT
+}
+
+// ─── IDEMPOTENCY ─────────────────────────────────────────────────
+
+model IdempotencyKey {
+  id           String    @id @default(uuid())
+  key          String    @unique
+  response     Json?     // Cached response
+  statusCode   Int?
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+
+  repayment    Repayment?
+
+  @@index([key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+// ─── ACCRUAL ─────────────────────────────────────────────────────
+
+model AccrualRecord {
+  id            String   @id @default(uuid())
+  loanId        String
+  accrualDate   DateTime @db.Date
+  interestPaise BigInt   // Daily accrued interest in paise
+  createdAt     DateTime @default(now())
+
+  loan          Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@unique([loanId, accrualDate])
+  @@index([loanId])
+  @@index([accrualDate])
+  @@map("accrual_records")
+}
+
+// ─── AUDIT LOG ───────────────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  action      String   // e.g., "LOAN_CREATED", "REPAYMENT_PROCESSED"
+  entityType  String   // e.g., "Loan", "Repayment"
+  entityId    String
+  before      Json?    // Snapshot before change
+  after       Json?    // Snapshot after change
+  ipAddress   String?
+  userAgent   String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
