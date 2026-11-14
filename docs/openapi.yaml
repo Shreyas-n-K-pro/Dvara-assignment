@@ -1,0 +1,1458 @@
+openapi: 3.0.3
+info:
+  title: Dvara Loan Account & Ledger Service API
+  version: 1.0.0
+  description: |
+    Production-grade microfinance Loan Account Management and Double-Entry Ledger Service.
+    
+    ### Key System Guarantees:
+    - **Double-Entry Financial Integrity:** Every financial transaction strictly satisfies $\sum \text{Debit} \equiv \sum \text{Credit}$.
+    - **Derived Balances:** Loan outstanding balances are dynamically derived from immutable ledger postings.
+    - **Exact Monetary Precision:** All monetary amounts are computed and stored as integer paise ($1\text{ INR} = 100\text{ paise}$) via `BigInt` with half-up rounding.
+    - **End-to-End Idempotency:** Repayment workflows enforce database-backed idempotency using the `Idempotency-Key` HTTP header.
+    - **Role-Based Access Control:** Role boundaries enforced across `LOAN_OFFICER`, `MANAGER`, and `AUDITOR`.
+  contact:
+    name: Dvara Engineering Team
+    url: https://github.com/Shreyas-n-K-pro/Dvara-assignment
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+  - url: http://127.0.0.1:3000
+    description: Loopback address
+
+tags:
+  - name: System
+    description: Health check and API metadata endpoints
+  - name: Authentication
+    description: User registration, JWT login, and profile retrieval
+  - name: Borrowers
+    description: Borrower profile lifecycle and management
+  - name: Loans
+    description: Loan applications, amortization schedules, and disbursements
+  - name: Repayments
+    description: Idempotent payment processing and waterfall allocations
+  - name: Ledger
+    description: Double-entry accounts, trial balances, and transaction reversals
+  - name: Accruals
+    description: Overdue interest and penalty accrual management and scheduler
+  - name: Audit Trail
+    description: Immutable append-only audit trail logging
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter JWT bearer token obtained from `/api/auth/login`.
+
+  parameters:
+    IdempotencyKeyHeader:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Unique client-generated idempotency key (UUIDv4 or string) preventing duplicate payments.
+      schema:
+        type: string
+        example: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+
+  schemas:
+    ApiResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              example: "Invalid payment amount or missing required fields"
+            details:
+              type: array
+              items:
+                type: string
+              example: ["amountPaise must be a positive integer"]
+
+    UserRole:
+      type: string
+      enum: [LOAN_OFFICER, MANAGER, AUDITOR]
+      example: "LOAN_OFFICER"
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Borrower:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        borrowerCode:
+          type: string
+          example: "BW-98210345"
+        firstName:
+          type: string
+          example: "Aarav"
+        lastName:
+          type: string
+          example: "Sharma"
+        email:
+          type: string
+          format: email
+          nullable: true
+          example: "aarav.sharma@example.com"
+        phone:
+          type: string
+          example: "9876543210"
+        address:
+          type: string
+          nullable: true
+          example: "123 MG Road, Bengaluru, Karnataka"
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+
+    LoanProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Monthly EMI Loan"
+        interestType:
+          type: string
+          enum: [FLAT, REDUCING_BALANCE]
+          example: "REDUCING_BALANCE"
+        repaymentFrequency:
+          type: string
+          enum: [WEEKLY, MONTHLY]
+          example: "MONTHLY"
+        interestRateBps:
+          type: integer
+          description: Annual interest rate in basis points (100 bps = 1.00%)
+          example: 1200
+        penaltyRateBps:
+          type: integer
+          description: Annual penalty rate in basis points
+          example: 200
+        gracePeriodDays:
+          type: integer
+          description: Grace period in days before overdue interest/penalty accrues
+          example: 3
+        minAmountPaise:
+          type: string
+          example: "1000000"
+        maxAmountPaise:
+          type: string
+          example: "100000000"
+
+    LoanStatus:
+      type: string
+      enum: [PENDING, APPROVED, DISBURSED, CLOSED, REJECTED, WRITTEN_OFF]
+      example: "DISBURSED"
+
+    RepaymentScheduleItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        instalmentNumber:
+          type: integer
+          example: 1
+        dueDate:
+          type: string
+          format: date
+          example: "2026-04-15"
+        principalDuePaise:
+          type: string
+          description: Principal due in integer paise
+          example: "833333"
+        interestDuePaise:
+          type: string
+          description: Interest due in integer paise
+          example: "100000"
+        totalDuePaise:
+          type: string
+          description: Total installment amount due in integer paise
+          example: "933333"
+        paidPrincipalPaise:
+          type: string
+          example: "833333"
+        paidInterestPaise:
+          type: string
+          example: "100000"
+        paidPenaltyPaise:
+          type: string
+          example: "0"
+        status:
+          type: string
+          enum: [PENDING, PARTIALLY_PAID, PAID, OVERDUE]
+          example: "PAID"
+
+    LoanBalance:
+      type: object
+      properties:
+        loanId:
+          type: string
+          format: uuid
+        disbursedPrincipalPaise:
+          type: string
+          example: "10000000"
+        principalRepaidPaise:
+          type: string
+          example: "2500000"
+        outstandingPrincipalPaise:
+          type: string
+          description: Dynamically computed from double-entry ledger postings
+          example: "7500000"
+        accruedInterestPaise:
+          type: string
+          example: "100000"
+        interestPaidPaise:
+          type: string
+          example: "100000"
+        accruedPenaltyPaise:
+          type: string
+          example: "0"
+        penaltyPaidPaise:
+          type: string
+          example: "0"
+        totalOutstandingPaise:
+          type: string
+          example: "7500000"
+
+    RepaymentAllocation:
+      type: object
+      properties:
+        scheduleId:
+          type: string
+          format: uuid
+        principalPaise:
+          type: string
+          example: "833333"
+        interestPaise:
+          type: string
+          example: "100000"
+        penaltyPaise:
+          type: string
+          example: "0"
+
+    Repayment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        loanId:
+          type: string
+          format: uuid
+        amountPaise:
+          type: string
+          example: "933333"
+        paymentDate:
+          type: string
+          format: date
+          example: "2026-04-15"
+        paymentMethod:
+          type: string
+          example: "BANK_TRANSFER"
+        referenceNumber:
+          type: string
+          example: "REF-20260415-001"
+        createdAt:
+          type: string
+          format: date-time
+
+    LedgerAccount:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Loans Receivable - Principal"
+        accountType:
+          type: string
+          enum: [ASSET, LIABILITY, INCOME, EXPENSE, EQUITY]
+          example: "ASSET"
+        balancePaise:
+          type: string
+          example: "75000000"
+        loanId:
+          type: string
+          format: uuid
+          nullable: true
+
+    TrialBalance:
+      type: object
+      properties:
+        isBalanced:
+          type: boolean
+          example: true
+        totalDebitsPaise:
+          type: string
+          example: "4218456960"
+        totalCreditsPaise:
+          type: string
+          example: "4218456960"
+        netDifferencePaise:
+          type: string
+          example: "0"
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/LedgerAccount'
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        action:
+          type: string
+          example: "REPAYMENT_PROCESSED"
+        entityType:
+          type: string
+          example: "Repayment"
+        entityId:
+          type: string
+          format: uuid
+        before:
+          type: object
+          nullable: true
+        after:
+          type: object
+          nullable: true
+        ipAddress:
+          type: string
+          nullable: true
+          example: "127.0.0.1"
+        createdAt:
+          type: string
+          format: date-time
+
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Service health check
+      description: Returns health status, active environment, and system timestamp.
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: "healthy"
+                      environment:
+                        type: string
+                        example: "development"
+                      timestamp:
+                        type: string
+                        format: date-time
+
+  /api/v1:
+    get:
+      tags: [System]
+      summary: API service metadata
+      responses:
+        '200':
+          description: API metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "Dvara Loan Account & Ledger Service API"
+                      version:
+                        type: string
+                        example: "1.0.0"
+
+  /api/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register system user
+      description: Creates a new user profile with bcrypt-hashed credentials.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "officer1@dvara.com"
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: "SecurePass123!"
+                name:
+                  type: string
+                  example: "Kavita Rao"
+                role:
+                  $ref: '#/components/schemas/UserRole'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      token:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate user
+      description: Authenticates user credentials and returns a signed JWT bearer token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "manager@dvara.com"
+                password:
+                  type: string
+                  format: password
+                  example: "ManagerSecret123!"
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      token:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '401':
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/me:
+    get:
+      tags: [Authentication]
+      summary: Retrieve current user profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+        '401':
+          description: Missing or invalid JWT token
+
+  /api/borrowers:
+    post:
+      tags: [Borrowers]
+      summary: Create borrower profile
+      description: |
+        Registers a new borrower applicant.
+        **Permitted Roles:** `LOAN_OFFICER`, `MANAGER` (AUDITOR strictly forbidden).
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, lastName, phone]
+              properties:
+                firstName:
+                  type: string
+                  example: "Ramesh"
+                lastName:
+                  type: string
+                  example: "Patel"
+                email:
+                  type: string
+                  format: email
+                  example: "ramesh.patel@example.com"
+                phone:
+                  type: string
+                  example: "9876543210"
+                address:
+                  type: string
+                  example: "12 Gandhi Bazaar, Ahmedabad, Gujarat"
+                borrowerCode:
+                  type: string
+                  example: "BW-98210345"
+      responses:
+        '201':
+          description: Borrower profile created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      borrower:
+                        $ref: '#/components/schemas/Borrower'
+        '400':
+          description: Invalid request parameters
+        '403':
+          description: Forbidden for AUDITOR role
+        '409':
+          description: Borrower code already exists
+
+    get:
+      tags: [Borrowers]
+      summary: List borrower profiles
+      description: |
+        Retrieves paginated list of borrowers.
+        **Permitted Roles:** `LOAN_OFFICER`, `MANAGER`, `AUDITOR`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of borrowers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      borrowers:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Borrower'
+                      pagination:
+                        type: object
+                        properties:
+                          page: { type: integer, example: 1 }
+                          limit: { type: integer, example: 20 }
+                          total: { type: integer, example: 300 }
+                          totalPages: { type: integer, example: 15 }
+
+  /api/borrowers/{id}:
+    get:
+      tags: [Borrowers]
+      summary: Get borrower by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Borrower details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      borrower:
+                        $ref: '#/components/schemas/Borrower'
+        '404':
+          description: Borrower not found
+
+  /api/loans:
+    post:
+      tags: [Loans]
+      summary: Create loan application & amortization schedule
+      description: |
+        Creates a new loan application and calculates exact repayment schedule using BigInt integer arithmetic.
+        **Permitted Roles:** `LOAN_OFFICER`, `MANAGER` (AUDITOR forbidden).
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [borrowerId, productId, principalPaise, tenureMonths]
+              properties:
+                borrowerId:
+                  type: string
+                  format: uuid
+                  example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                productId:
+                  type: string
+                  format: uuid
+                  example: "7ca85f64-5717-4562-b3fc-2c963f66afa7"
+                principalPaise:
+                  type: string
+                  description: Loan principal in integer paise (e.g. ₹50,000 = "5000000")
+                  example: "5000000"
+                tenureMonths:
+                  type: integer
+                  example: 12
+                disbursementDate:
+                  type: string
+                  format: date
+                  example: "2026-03-01"
+      responses:
+        '201':
+          description: Loan created with repayment schedule
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      loan:
+                        type: object
+                        properties:
+                          id: { type: string, format: uuid }
+                          loanNumber: { type: string, example: "LN-2026-0001" }
+                          status: { $ref: '#/components/schemas/LoanStatus' }
+                          principalPaise: { type: string, example: "5000000" }
+                      schedule:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RepaymentScheduleItem'
+        '400':
+          description: Invalid loan parameters or violates product limits
+        '403':
+          description: Forbidden for AUDITOR role
+        '404':
+          description: Borrower or Loan Product not found
+
+    get:
+      tags: [Loans]
+      summary: List loans
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: borrowerId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/LoanStatus'
+      responses:
+        '200':
+          description: List of loans
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      loans:
+                        type: array
+                        items:
+                          type: object
+                      pagination:
+                        type: object
+
+  /api/loans/{id}:
+    get:
+      tags: [Loans]
+      summary: Get loan details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Loan details with borrower and product
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+        '404':
+          description: Loan not found
+
+  /api/loans/{id}/disburse:
+    post:
+      tags: [Loans]
+      summary: Disburse loan & post initial ledger transaction
+      description: |
+        Disburses an approved loan and posts initial double-entry transaction:
+        - Debit: `Loans Receivable - Principal`
+        - Credit: `Cash / Bank`
+        **Permitted Roles:** `LOAN_OFFICER`, `MANAGER` (AUDITOR forbidden).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                disbursementDate:
+                  type: string
+                  format: date
+                  example: "2026-03-01"
+      responses:
+        '200':
+          description: Loan disbursed and ledger posted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      loan:
+                        type: object
+                      transaction:
+                        type: object
+        '400':
+          description: Loan is already disbursed or not in valid state
+        '403':
+          description: Forbidden for AUDITOR role
+        '404':
+          description: Loan not found
+
+  /api/loans/{id}/schedule:
+    get:
+      tags: [Loans]
+      summary: Retrieve loan repayment schedule
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Full amortization schedule
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      loanId: { type: string, format: uuid }
+                      schedule:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RepaymentScheduleItem'
+        '404':
+          description: Loan not found
+
+  /api/loans/{id}/balance:
+    get:
+      tags: [Loans]
+      summary: Retrieve derived loan ledger balance
+      description: |
+        Computes authoritative loan outstanding balance directly from double-entry ledger postings.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Loan ledger balances
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    $ref: '#/components/schemas/LoanBalance'
+        '404':
+          description: Loan not found
+
+  /api/repayments:
+    post:
+      tags: [Repayments]
+      summary: Process repayment with idempotency guarantee
+      description: |
+        Processes loan repayments following standard microfinance waterfall:
+        1. **Penalties**
+        2. **Accrued Interest**
+        3. **Principal**
+        
+        Prioritizes oldest overdue installments. Atomically commits allocations, ledger entries, and audit record within a single database transaction.
+        
+        ### Idempotency Behavior:
+        - **First transmission:** Returns HTTP `201 Created` with processed repayment and balanced ledger postings.
+        - **Identical retry (same key + same payload):** Returns HTTP `200 OK` with cached original response (zero duplicate ledger entries or DB records).
+        - **Conflicting request (same key + different payload):** Rejects with HTTP `409 Conflict`.
+        
+        **Permitted Roles:** `LOAN_OFFICER`, `MANAGER` (AUDITOR forbidden).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [loanId, amountPaise, paymentDate]
+              properties:
+                loanId:
+                  type: string
+                  format: uuid
+                  example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                amountPaise:
+                  type: string
+                  description: Payment amount in integer paise (e.g. ₹9,333.33 = "933333")
+                  example: "933333"
+                paymentDate:
+                  type: string
+                  format: date
+                  example: "2026-04-15"
+                paymentMethod:
+                  type: string
+                  enum: [CASH, BANK_TRANSFER, UPI, CHEQUE]
+                  example: "UPI"
+                referenceNumber:
+                  type: string
+                  example: "UPI-TXN-98234871"
+      responses:
+        '201':
+          description: Repayment processed successfully (New payment)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      repayment:
+                        $ref: '#/components/schemas/Repayment'
+                      allocations:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RepaymentAllocation'
+                      transaction:
+                        type: object
+                        properties:
+                          id: { type: string, format: uuid }
+                          transactionRef: { type: string, example: "TXN-REP-001" }
+        '200':
+          description: Idempotent replay of previously processed repayment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+        '400':
+          description: Validation error or payment exceeds outstanding balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid JWT authentication
+        '403':
+          description: Forbidden for AUDITOR role
+        '404':
+          description: Loan not found
+        '409':
+          description: Idempotency conflict (same key used with differing payload)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/repayments/{id}:
+    get:
+      tags: [Repayments]
+      summary: Get repayment details and waterfall allocations
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Repayment details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      repayment:
+                        $ref: '#/components/schemas/Repayment'
+                      allocations:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RepaymentAllocation'
+        '404':
+          description: Repayment not found
+
+  /api/ledger/accounts:
+    get:
+      tags: [Ledger]
+      summary: List chart of ledger accounts and balances
+      description: |
+        Retrieves active ledger accounts and derived balances.
+        **Permitted Roles:** `MANAGER`, `AUDITOR` (LOAN_OFFICER forbidden).
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of ledger accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      accounts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/LedgerAccount'
+        '403':
+          description: Forbidden for LOAN_OFFICER role
+
+  /api/ledger/trial-balance:
+    get:
+      tags: [Ledger]
+      summary: Verify double-entry global trial balance
+      description: |
+        Asserts system-wide double-entry equilibrium $\sum \text{Debit} \equiv \sum \text{Credit}$.
+        **Permitted Roles:** `MANAGER`, `AUDITOR`.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: System trial balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    $ref: '#/components/schemas/TrialBalance'
+        '403':
+          description: Forbidden for LOAN_OFFICER role
+
+  /api/ledger/transactions/{id}:
+    get:
+      tags: [Ledger]
+      summary: Get ledger transaction entries
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transaction entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+        '404':
+          description: Transaction not found
+
+  /api/ledger/transactions/{id}/reverse:
+    post:
+      tags: [Ledger]
+      summary: Reverse posted transaction with compensating contra entries
+      description: |
+        Creates an equal-and-opposite contra transaction. Never mutates or deletes posted entries.
+        **Permitted Roles:** `MANAGER` only (LOAN_OFFICER and AUDITOR forbidden).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  example: "Reversal due to duplicate bank processing error"
+      responses:
+        '200':
+          description: Transaction reversed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      originalTransactionId: { type: string, format: uuid }
+                      reversalTransaction: { type: object }
+        '400':
+          description: Transaction is already reversed
+        '403':
+          description: Forbidden for non-MANAGER roles
+        '404':
+          description: Transaction not found
+
+  /api/accruals/overdue:
+    post:
+      tags: [Accruals]
+      summary: Protected manual trigger for overdue interest & penalty accrual
+      description: |
+        Calculates and posts daily interest and penalties on overdue installments using the ACTUAL/365 convention with database-level uniqueness.
+        **Permitted Roles:** `MANAGER` only.
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                asOfDate:
+                  type: string
+                  format: date
+                  example: "2026-06-01"
+      responses:
+        '200':
+          description: Overdue accruals processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      asOfDate: { type: string, format: date }
+                      processedLoans: { type: integer, example: 45 }
+                      totalAccruals: { type: integer, example: 78 }
+                      totalInterestPaise: { type: string, example: "128450" }
+                      totalPenaltyPaise: { type: string, example: "64220" }
+        '403':
+          description: Forbidden for non-MANAGER roles
+
+  /api/accruals/run:
+    post:
+      tags: [Accruals]
+      summary: Run daily overdue interest & penalty accrual job
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                asOfDate:
+                  type: string
+                  format: date
+                  example: "2026-06-01"
+      responses:
+        '200':
+          description: Accrual job completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data: { type: object }
+
+  /api/accruals/manual:
+    post:
+      tags: [Accruals]
+      summary: Trigger manual interest accrual on single loan
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [loanId]
+              properties:
+                loanId:
+                  type: string
+                  format: uuid
+                  example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                asOfDate:
+                  type: string
+                  format: date
+                  example: "2026-06-01"
+      responses:
+        '200':
+          description: Manual accrual posted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data: { type: object }
+        '404':
+          description: Loan not found
+
+  /api/accruals/scheduler/status:
+    get:
+      tags: [Accruals]
+      summary: Inspect cron scheduler state
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Scheduler status telemetry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      isRunning: { type: boolean, example: true }
+                      cronExpression: { type: string, example: "0 0 * * *" }
+                      isJobExecuting: { type: boolean, example: false }
+
+  /api/accruals/scheduler/start:
+    post:
+      tags: [Accruals]
+      summary: Start automated daily accrual background cron
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Scheduler started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data: { type: object }
+
+  /api/accruals/scheduler/stop:
+    post:
+      tags: [Accruals]
+      summary: Stop automated daily accrual background cron
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Scheduler stopped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data: { type: object }
+
+  /api/audit-logs:
+    get:
+      tags: [Audit Trail]
+      summary: Query immutable audit logs
+      description: |
+        Retrieves paginated audit trail logs.
+        **Permitted Roles:** `MANAGER`, `AUDITOR` (LOAN_OFFICER forbidden).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: entityType
+          in: query
+          schema:
+            type: string
+            example: "Repayment"
+        - name: action
+          in: query
+          schema:
+            type: string
+            example: "REPAYMENT_PROCESSED"
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Paginated audit logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      logs:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AuditLog'
+                      pagination:
+                        type: object
+        '403':
+          description: Forbidden for LOAN_OFFICER role
+
+  /api/audit-logs/{id}:
+    get:
+      tags: [Audit Trail]
+      summary: Get audit log entry by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Audit log details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      log:
+                        $ref: '#/components/schemas/AuditLog'
+        '404':
+          description: Audit log not found

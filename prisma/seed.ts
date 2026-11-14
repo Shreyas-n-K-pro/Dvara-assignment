@@ -1,37 +1,53 @@
-import { PrismaClient, InterestType, RepaymentFrequency } from '@prisma/client';
+import { PrismaClient, InterestType, RepaymentFrequency, UserRole } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
   console.log('Starting database seed...');
 
-  // 1. Create default admin user
-  const adminUser = await prisma.user.upsert({
-    where: { email: 'admin@dvara.com' },
-    update: {},
+  // 1. Create default seeded system users with bcrypt hashes
+  const managerHash = await bcrypt.hash('ManagerSecret123!', 10);
+  const officerHash = await bcrypt.hash('OfficerSecret123!', 10);
+  const auditorHash = await bcrypt.hash('AuditorSecret123!', 10);
+
+  const managerUser = await prisma.user.upsert({
+    where: { email: 'manager@dvara.com' },
+    update: { password: managerHash, role: UserRole.MANAGER },
     create: {
-      email: 'admin@dvara.com',
-      password: '$2b$10$placeholder_hash_replace_in_production',
-      name: 'System Admin',
-      role: 'ADMIN',
+      email: 'manager@dvara.com',
+      password: managerHash,
+      name: 'Operations Manager',
+      role: UserRole.MANAGER,
     },
   });
-  console.log(`Created admin user: ${adminUser.email}`);
+  console.log(`Created/updated manager user: ${managerUser.email} (${managerUser.role})`);
 
-  // 2. Create default loan officer
   const officerUser = await prisma.user.upsert({
     where: { email: 'officer@dvara.com' },
-    update: {},
+    update: { password: officerHash, role: UserRole.LOAN_OFFICER },
     create: {
       email: 'officer@dvara.com',
-      password: '$2b$10$placeholder_hash_replace_in_production',
+      password: officerHash,
       name: 'Loan Officer',
-      role: 'OFFICER',
+      role: UserRole.LOAN_OFFICER,
     },
   });
-  console.log(`Created officer user: ${officerUser.email}`);
+  console.log(`Created/updated loan officer user: ${officerUser.email} (${officerUser.role})`);
 
-  // 3. Create the three required loan products for Phase 2:
+  const auditorUser = await prisma.user.upsert({
+    where: { email: 'auditor@dvara.com' },
+    update: { password: auditorHash, role: UserRole.AUDITOR },
+    create: {
+      email: 'auditor@dvara.com',
+      password: auditorHash,
+      name: 'Financial Auditor',
+      role: UserRole.AUDITOR,
+    },
+  });
+  console.log(`Created/updated auditor user: ${auditorUser.email} (${auditorUser.role})`);
+
+  // 2. Create the three required loan products for Phase 2 & 7:
   // Product 1: Weekly Group Loan – weekly repayment, flat-rate interest.
   const weeklyGroupLoan = await prisma.loanProduct.upsert({
     where: { name: 'Weekly Group Loan' },
@@ -45,6 +61,7 @@ async function main(): Promise<void> {
       maxAmountPaise: BigInt(10000000), // ₹1,00,000
       penaltyRateBps: 200,
       processingFeeBps: 100,
+      gracePeriodDays: 3,
     },
     create: {
       name: 'Weekly Group Loan',
@@ -58,6 +75,7 @@ async function main(): Promise<void> {
       maxAmountPaise: BigInt(10000000), // ₹1,00,000
       penaltyRateBps: 200,
       processingFeeBps: 100,
+      gracePeriodDays: 3,
     },
   });
   console.log(`Created loan product: ${weeklyGroupLoan.name} (${weeklyGroupLoan.interestType}, ${weeklyGroupLoan.repaymentFrequency})`);
@@ -75,6 +93,7 @@ async function main(): Promise<void> {
       maxAmountPaise: BigInt(100000000), // ₹10,00,000
       penaltyRateBps: 200,
       processingFeeBps: 150,
+      gracePeriodDays: 3,
     },
     create: {
       name: 'Monthly EMI Loan',
@@ -88,6 +107,7 @@ async function main(): Promise<void> {
       maxAmountPaise: BigInt(100000000), // ₹10,00,000
       penaltyRateBps: 200,
       processingFeeBps: 150,
+      gracePeriodDays: 3,
     },
   });
   console.log(`Created loan product: ${monthlyEmiLoan.name} (${monthlyEmiLoan.interestType}, ${monthlyEmiLoan.repaymentFrequency})`);
@@ -105,6 +125,7 @@ async function main(): Promise<void> {
       maxAmountPaise: BigInt(50000000), // ₹5,00,000
       penaltyRateBps: 250,
       processingFeeBps: 200,
+      gracePeriodDays: 3,
     },
     create: {
       name: 'Flat Rate Loan',
@@ -118,6 +139,7 @@ async function main(): Promise<void> {
       maxAmountPaise: BigInt(50000000), // ₹5,00,000
       penaltyRateBps: 250,
       processingFeeBps: 200,
+      gracePeriodDays: 3,
     },
   });
   console.log(`Created loan product: ${flatRateLoan.name} (${flatRateLoan.interestType}, ${flatRateLoan.repaymentFrequency})`);

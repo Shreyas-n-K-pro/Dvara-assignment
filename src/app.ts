@@ -2,6 +2,8 @@ import 'express-async-errors';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import path from 'path';
+import fs from 'fs';
 import { errorHandler, requestLogger } from './middleware';
 import { config } from './config';
 import { NotFoundError } from './utils';
@@ -16,7 +18,11 @@ import { auditRoutes } from './modules/audit';
 const app = express();
 
 // Security middleware
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+  })
+);
 app.use(cors());
 
 // Body parsing
@@ -36,6 +42,51 @@ app.get('/health', (_req, res) => {
       timestamp: new Date().toISOString(),
     },
   });
+});
+
+// Swagger & OpenAPI documentation
+app.get('/docs/openapi.yaml', (_req, res) => {
+  const filePath = path.resolve(process.cwd(), 'docs/openapi.yaml');
+  if (fs.existsSync(filePath)) {
+    res.type('text/yaml').sendFile(filePath);
+  } else {
+    res.type('text/yaml').sendFile(path.resolve(process.cwd(), 'openapi.yaml'));
+  }
+});
+
+app.get('/docs', (_req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dvara Loan Account & Ledger Service - Swagger UI</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5/favicon-32x32.png" />
+  <style>
+    html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
+    *, *:before, *:after { box-sizing: inherit; }
+    body { margin:0; background: #fafafa; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = function() {
+      SwaggerUIBundle({
+        url: "/docs/openapi.yaml",
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIBundle.SwaggerUIStandalonePreset
+        ],
+        layout: "BaseLayout"
+      });
+    };
+  </script>
+</body>
+</html>`);
 });
 
 // API routes placeholder

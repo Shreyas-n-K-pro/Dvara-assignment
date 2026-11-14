@@ -152,6 +152,9 @@ curl http://localhost:3000/api/v1
 | `npm run prisma:studio` | Open Prisma Studio GUI |
 | `npm run docker:up` | Start MySQL container |
 | `npm run docker:down` | Stop MySQL container |
+| `npm run generate:dataset` | Generate 5,000-event synthetic dataset (seed=42) |
+| `npm run replay:events` | Replay 5,000 events through live REST API |
+| `npm run verify:ledger` | Verify all 9 post-replay ledger reconciliation invariants |
 
 ## Supported Loan Products (Phase 2)
 
@@ -343,6 +346,48 @@ Output artifact: `reports/reconciliation-report.json`
 | POST | `/api/accruals/scheduler/start` | `MANAGER` | Start the background cron scheduler |
 | POST | `/api/accruals/scheduler/stop` | `MANAGER` | Stop the background cron scheduler |
 | GET | `/api/audit-logs` | `MANAGER`, `AUDITOR` | Retrieve append-only audit trail logs |
+
+## Swagger & OpenAPI Documentation
+
+Interactive OpenAPI 3.0 documentation with live request execution is accessible via:
+
+- **Interactive Swagger UI:** [http://localhost:3000/docs](http://localhost:3000/docs)
+- **Raw OpenAPI 3.0 Spec:** [`docs/openapi.yaml`](file:///c:/Users/shrey/Dvara-assignment/docs/openapi.yaml) or `http://localhost:3000/docs/openapi.yaml`
+
+The specification comprehensively covers all endpoints, query parameters, request/response schemas, JWT bearer security definitions, `Idempotency-Key` header behaviors (201 Created vs 200 Idempotent Replay vs 409 Conflict), and complete error schemas.
+
+## Postman Collection
+
+An importable Postman collection is provided in the repository:
+
+- **Collection File:** [`postman/dvara_loan_ledger.postman_collection.json`](file:///c:/Users/shrey/Dvara-assignment/postman/dvara_loan_ledger.postman_collection.json) (also mirrored at `postman_collection.json`)
+
+### Import Instructions:
+1. Open Postman $\to$ Click **Import** $\to$ Select `postman/dvara_loan_ledger.postman_collection.json`.
+2. The collection is organized into 8 functional folders:
+   - **1. Authentication:** User registration, Manager/Officer login, Profile inspection (automatically sets `token` variable).
+   - **2. Borrowers:** Borrower creation and listing (automatically sets `borrowerId`).
+   - **3. Loans Lifecycle:** Loan creation, disbursement, schedule generation, and derived balance inspection (sets `loanId`).
+   - **4. Repayments & Idempotency:** Valid repayment, identical retry (200 OK), payload conflict (409 Conflict), and allocation lookup.
+   - **5. Ledger & Accounting:** Account listing, global trial balance ($\sum \text{Debit} \equiv \sum \text{Credit}$), and transaction reversal.
+   - **6. Accruals & Scheduler:** Overdue interest & penalty engine execution, manual triggers, and cron controls.
+   - **7. Audit Trail:** Paginated audit log retrieval.
+   - **8. System Health:** Health check and API metadata.
+3. Pre-configured collection variables:
+   - `baseUrl`: `http://localhost:3000` (default)
+   - `token`: Populated automatically upon executing any Login request.
+
+## Seeded Local Development Credentials
+
+For quick local evaluation, running `npm run prisma:seed` populates the database with default accounts (passwords hashed with `bcryptjs` 10 rounds):
+
+| Role | Email | Password | Permissions |
+|---|---|---|---|
+| **`MANAGER`** | `manager@dvara.com` | `ManagerSecret123!` | Complete system access: disbursements, repayments, reversals, manual accruals, audit logs, trial balances. |
+| **`LOAN_OFFICER`** | `officer@dvara.com` | `OfficerSecret123!` | Day-to-day operations: borrower registration, loan application, disbursement, repayment processing. |
+| **`AUDITOR`** | `auditor@dvara.com` | `AuditorSecret123!` | Read-only oversight: schedules, ledger accounts, trial balance, audit logs. Mutations forbidden (HTTP 403). |
+
+*(Note: These are synthetic credentials intended exclusively for local development and integration testing.)*
 
 
 ## Environment Variables

@@ -1,0 +1,638 @@
+{
+  "info": {
+    "_postman_id": "c1f7a390-482d-4d2c-9a29-2319ef47d100",
+    "name": "Dvara Loan Account & Ledger Service API",
+    "description": "Comprehensive Postman collection for testing the Dvara Loan Account & Ledger Service.\n\nCovers:\n- Authentication (JWT & RBAC)\n- Borrower Creation & Lookup\n- Loan Creation, Amortization Schedule & Disbursement\n- Idempotent Repayment Ingestion (201 Created, 200 Idempotent Replay, 409 Conflict)\n- Derived Ledger Balance & Double-Entry Accounting\n- Accrual Calculation Engine (node-cron & manual triggers)\n- Append-Only Audit Trail",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "borrowerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "loanId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "repaymentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transactionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "demoIdempotencyKey",
+      "value": "demo-postman-repayment-key-001",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Register System User",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"loan.officer@dvara.com\",\n  \"password\": \"OfficerSecret123!\",\n  \"name\": \"Priya Sharma\",\n  \"role\": \"LOAN_OFFICER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login as Manager",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.token) {",
+                  "    pm.collectionVariables.set(\"token\", res.data.token);",
+                  "    pm.test(\"Token acquired and saved to collection variable\", () => {",
+                  "        pm.expect(res.data.token).to.be.a(\"string\");",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"manager@dvara.com\",\n  \"password\": \"ManagerSecret123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login as Loan Officer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.token) {",
+                  "    pm.collectionVariables.set(\"token\", res.data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"officer@dvara.com\",\n  \"password\": \"OfficerSecret123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Current Profile (Me)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Borrowers",
+      "item": [
+        {
+          "name": "Create Borrower",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.borrower) {",
+                  "    pm.collectionVariables.set(\"borrowerId\", res.data.borrower.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Suresh\",\n  \"lastName\": \"Verma\",\n  \"phone\": \"9812345678\",\n  \"email\": \"suresh.verma@example.com\",\n  \"address\": \"45 MG Road, Bengaluru, Karnataka\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/borrowers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "borrowers"]
+            }
+          }
+        },
+        {
+          "name": "List Borrowers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/borrowers?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "borrowers"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Borrower by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/borrowers/{{borrowerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "borrowers", "{{borrowerId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Loans Lifecycle",
+      "item": [
+        {
+          "name": "Create Loan Application",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.loan) {",
+                  "    pm.collectionVariables.set(\"loanId\", res.data.loan.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"borrowerId\": \"{{borrowerId}}\",\n  \"productId\": \"{{productId}}\",\n  \"principalPaise\": \"5000000\",\n  \"tenureMonths\": 12,\n  \"disbursementDate\": \"2026-03-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/loans",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "loans"]
+            }
+          }
+        },
+        {
+          "name": "Disburse Loan",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.transaction) {",
+                  "    pm.collectionVariables.set(\"transactionId\", res.data.transaction.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"disbursementDate\": \"2026-03-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/loans/{{loanId}}/disburse",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "loans", "{{loanId}}", "disburse"]
+            }
+          }
+        },
+        {
+          "name": "Get Loan Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/loans/{{loanId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "loans", "{{loanId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Loan Amortization Schedule",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/loans/{{loanId}}/schedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "loans", "{{loanId}}", "schedule"]
+            }
+          }
+        },
+        {
+          "name": "Get Loan Ledger Balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/loans/{{loanId}}/balance",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "loans", "{{loanId}}", "balance"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Repayments & Idempotency",
+      "item": [
+        {
+          "name": "Post Repayment (Initial 201 Created)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201 Created\", () => {",
+                  "    pm.expect(pm.response.code).to.equal(201);",
+                  "});",
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.repayment) {",
+                  "    pm.collectionVariables.set(\"repaymentId\", res.data.repayment.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{demoIdempotencyKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loanId\": \"{{loanId}}\",\n  \"amountPaise\": \"444244\",\n  \"paymentDate\": \"2026-04-01\",\n  \"paymentMethod\": \"BANK_TRANSFER\",\n  \"referenceNumber\": \"NEFT-20260401-001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/repayments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repayments"]
+            }
+          }
+        },
+        {
+          "name": "Repeated Repayment (Idempotent 200 OK Replay)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK (Idempotent Replay)\", () => {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{demoIdempotencyKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loanId\": \"{{loanId}}\",\n  \"amountPaise\": \"444244\",\n  \"paymentDate\": \"2026-04-01\",\n  \"paymentMethod\": \"BANK_TRANSFER\",\n  \"referenceNumber\": \"NEFT-20260401-001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/repayments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repayments"]
+            }
+          }
+        },
+        {
+          "name": "Idempotency Conflict (409 Conflict)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 409 Conflict (Payload Mismatch)\", () => {",
+                  "    pm.expect(pm.response.code).to.equal(409);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{demoIdempotencyKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loanId\": \"{{loanId}}\",\n  \"amountPaise\": \"999999\",\n  \"paymentDate\": \"2026-04-01\",\n  \"paymentMethod\": \"CASH\",\n  \"referenceNumber\": \"CONFLICT-TEST\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/repayments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repayments"]
+            }
+          }
+        },
+        {
+          "name": "Get Repayment by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/repayments/{{repaymentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "repayments", "{{repaymentId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Ledger & Accounting",
+      "item": [
+        {
+          "name": "List Ledger Accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ledger/accounts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ledger", "accounts"]
+            }
+          }
+        },
+        {
+          "name": "Verify Global Trial Balance",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Trial balance is in equilibrium (Debits == Credits)\", () => {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.data.isBalanced).to.be.true;",
+                  "    pm.expect(res.data.netDifferencePaise).to.equal(\"0\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ledger/trial-balance",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ledger", "trial-balance"]
+            }
+          }
+        },
+        {
+          "name": "Get Ledger Transaction by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ledger/transactions/{{transactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ledger", "transactions", "{{transactionId}}"]
+            }
+          }
+        },
+        {
+          "name": "Reverse Transaction (Manager Only)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Bank processing duplication compensation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/ledger/transactions/{{transactionId}}/reverse",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ledger", "transactions", "{{transactionId}}", "reverse"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Accruals & Scheduler",
+      "item": [
+        {
+          "name": "Trigger Overdue Accruals (ACTUAL/365)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"asOfDate\": \"2026-06-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/accruals/overdue",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "accruals", "overdue"]
+            }
+          }
+        },
+        {
+          "name": "Manual Loan Accrual",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loanId\": \"{{loanId}}\",\n  \"asOfDate\": \"2026-06-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/accruals/manual",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "accruals", "manual"]
+            }
+          }
+        },
+        {
+          "name": "Get Scheduler Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/accruals/scheduler/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "accruals", "scheduler", "status"]
+            }
+          }
+        },
+        {
+          "name": "Start Daily Accrual Cron",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/accruals/scheduler/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "accruals", "scheduler", "start"]
+            }
+          }
+        },
+        {
+          "name": "Stop Daily Accrual Cron",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/accruals/scheduler/stop",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "accruals", "scheduler", "stop"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Audit Trail",
+      "item": [
+        {
+          "name": "Query Audit Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/audit-logs?limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "audit-logs"],
+              "query": [
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. System Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "API Metadata",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
