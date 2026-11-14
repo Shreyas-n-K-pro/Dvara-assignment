@@ -1,0 +1,46 @@
+================================================================================
+             DVARA REPAYMENT REPLAY ENGINE - RECONCILIATION REPORT
+================================================================================
+Execution Start:     2026-11-14T12:58:59.232Z
+Execution Finish:    2026-11-14T12:59:27.271Z
+Duration:            27.87 seconds
+Throughput:          179.4 requests/sec
+Active Workers:      8
+
+--------------------------------------------------------------------------------
+EVENT PROCESSING SUMMARY
+--------------------------------------------------------------------------------
+Total Events Replayed:        5000
+Successful Repayments (201):  588
+Idempotent Cached (200):      4058
+Conflict Errors (409):        50
+Validation Errors (400):      254
+Not Found Errors (404):       50
+Unexpected Server Errors:     0
+
+--------------------------------------------------------------------------------
+LATENCY BENCHMARKS (ms)
+--------------------------------------------------------------------------------
+Min:    4 ms
+Avg:    44 ms
+Max:    2202 ms
+p50:    13 ms
+p95:    152 ms
+p99:    648 ms
+
+--------------------------------------------------------------------------------
+SCENARIO INTEGRITY BREAKDOWN
+--------------------------------------------------------------------------------
+  - VALID_PARTIAL       : Total= 1878 | Matched= 1827 | Failed=  51
+  - VALID_ODD_AMOUNT    : Total=  617 | Matched=  615 | Failed=   2
+  - VALID_REGULAR       : Total= 1338 | Matched= 1264 | Failed=  74
+  - DUPLICATE_RETRY     : Total=  500 | Matched=  500 | Failed=   0
+  - VALID_PREPAYMENT    : Total=  467 | Matched=  440 | Failed=  27
+  - CONFLICT_KEY        : Total=   50 | Matched=   50 | Failed=   0
+  - INVALID_NEGATIVE    : Total=   50 | Matched=   50 | Failed=   0
+  - INVALID_ZERO        : Total=   50 | Matched=   50 | Failed=   0
+  - INVALID_LOAN        : Total=   50 | Matched=   50 | Failed=   0
+
+================================================================================
+                                END OF REPORT
+================================================================================

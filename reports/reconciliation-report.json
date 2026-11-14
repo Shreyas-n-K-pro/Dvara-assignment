@@ -1,0 +1,90 @@
+{
+  "timestamp": "2026-11-14T13:00:16.737Z",
+  "overallPassed": true,
+  "totalChecks": 9,
+  "passedChecks": 9,
+  "failedChecks": 0,
+  "checks": [
+    {
+      "id": 1,
+      "name": "Total Input Events Verification",
+      "passed": true,
+      "details": "Dataset has 5000 events, Replay executed 5000 events."
+    },
+    {
+      "id": 2,
+      "name": "Duplicate Request Idempotency (No Double-Posting)",
+      "passed": true,
+      "details": "Verified 500 duplicate retry keys. Total DB repayments linked: 500. Zero duplicate postings detected."
+    },
+    {
+      "id": 3,
+      "name": "Per-Transaction Double-Entry Balance",
+      "passed": true,
+      "details": "Audited 4455 posted transactions. Unbalanced transactions: 0.",
+      "metrics": {
+        "totalTransactions": 4455,
+        "unbalancedCount": 0
+      }
+    },
+    {
+      "id": 4,
+      "name": "Global Trial Balance Reconciliation",
+      "passed": true,
+      "details": "Total Debits: ₹4,21,84,569.6, Total Credits: ₹4,21,84,569.6. Net Difference: 0 paise.",
+      "metrics": {
+        "globalDebitPaise": "4218456960",
+        "globalCreditPaise": "4218456960",
+        "diffPaise": "0"
+      }
+    },
+    {
+      "id": 5,
+      "name": "Non-Negative Outstanding Principal Invariant",
+      "passed": true,
+      "details": "Audited 301 active loans. Loans with negative remaining principal: 0.",
+      "metrics": {
+        "auditedLoans": 301,
+        "negativeLoansCount": 0
+      }
+    },
+    {
+      "id": 6,
+      "name": "Accrual Idempotency (Zero Duplicate Accruals)",
+      "passed": true,
+      "details": "Duplicate (schedule, date, type) accrual records: 0.",
+      "metrics": {
+        "dupAccrualCount": 0
+      }
+    },
+    {
+      "id": 7,
+      "name": "Transactional Atomicity (No Dangling Unposted Records)",
+      "passed": true,
+      "details": "Unposted ledger entries: 0. Unposted ledger transactions: 0. All committed rows are complete.",
+      "metrics": {
+        "unpostedEntries": 0,
+        "unpostedTransactions": 0
+      }
+    },
+    {
+      "id": 8,
+      "name": "Repayment Allocation Completeness",
+      "passed": true,
+      "details": "Audited 4146 repayments. Repayments with allocation mismatches: 0.",
+      "metrics": {
+        "totalRepayments": 4146,
+        "allocationDiscrepancies": 0
+      }
+    },
+    {
+      "id": 9,
+      "name": "Waterfall Policy & Schedule Integrity Under Out-of-Order Events",
+      "passed": true,
+      "details": "All out-of-order repayments safely allocated oldest-first without schedule corruption. Violations: 0.",
+      "metrics": {
+        "scheduleViolations": 0
+      }
+    }
+  ]
+}

@@ -63,25 +63,15 @@ describe('Phase 6: Authentication, RBAC, and Audit Trail Integration Tests', () 
 
   afterAll(async () => {
     try {
-      await prisma.$executeRaw`SET FOREIGN_KEY_CHECKS = 0;`;
-      await prisma.auditLog.deleteMany();
-      await prisma.accrualRecord.deleteMany();
-      await prisma.repaymentAllocation.deleteMany();
-      await prisma.repayment.deleteMany();
-      await prisma.idempotencyKey.deleteMany();
-      await prisma.repaymentSchedule.deleteMany();
-      await prisma.ledgerEntry.deleteMany();
-      await prisma.ledgerTransaction.deleteMany();
-      await prisma.ledgerAccount.deleteMany();
-      await prisma.loan.deleteMany();
-      await prisma.borrower.deleteMany();
-      await prisma.loanProduct.deleteMany();
-      await prisma.user.deleteMany();
-      await prisma.$executeRaw`SET FOREIGN_KEY_CHECKS = 1;`;
+      await prisma.user.deleteMany({
+        where: { email: { contains: '@test.dvara.com' } },
+      });
     } catch {
       // Ignore cleanup errors
+    } finally {
+      await prisma.$disconnect();
     }
-  });
+  }, 10000);
 
   describe('1. Authentication & Security Invariants', () => {
     it('should register a new user and never expose password', async () => {

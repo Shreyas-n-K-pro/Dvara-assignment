@@ -372,6 +372,53 @@ Every overdue accrual posts balanced ledger entries:
   * Credit: `Penalty Income` (Income account)
 Ensures $\sum \text{Debit} \equiv \sum \text{Credit}$ and maintains trial balance integrity across all runs.
 
+---
+
+## Phase 8: Synthetic Dataset Generation, Repayment Replay & Ledger Reconciliation
+
+### 1. Synthetic Dataset Architecture (`scripts/generate-dataset.ts`)
+* **Deterministic Pseudo-Random Generation**:
+  * Implements a deterministic Linear Congruential Generator (LCG) / Mulberry32 PRNG seeded with `seed = 42`.
+  * Generates 100% reproducible borrower profiles, loan terms, and repayment event sequences across environments.
+* **Domain Entity Synthesis**:
+  * **300 Fictional Borrowers**: Generated with realistic Indian names, unique alphanumeric borrower codes (`BW-XXXXXXXX`), valid 10-digit phone numbers, and addresses across Indian cities.
+  * **3 Standard Loan Products**:
+    * *Weekly Group Loan* (15.00% p.a., Flat, Weekly)
+    * *Monthly EMI Loan* (12.00% p.a., Reducing Balance, Monthly)
+    * *Flat Rate Loan* (14.00% p.a., Flat, Monthly)
+  * **300 Disbursed Synthetic Loans**: Realistic principal amounts (₹10,000 to ₹1,00,000 in integer paise) with corresponding repayment schedules generated via Phase 2 calculation engines.
+* **Repayment Event Stream (5,000 Total Events)**:
+  * **4,300 Unique Valid Events**: Repayment amounts aligned with scheduled installment amounts and partial payments.
+  * **500 Deliberate Identical Retries**: Exact duplicate transmissions sharing identical `idempotencyKey` and payload to verify idempotent HTTP 200 replay handling.
+  * **50 Key-Conflict Events**: Re-using existing idempotency keys with altered amounts or dates to verify HTTP 409 conflict detection.
+  * **150 Invalid Scenario Events**: Fictional non-existent loan IDs, negative/zero amounts, malformed date strings, and closed loans to exercise input validation (HTTP 400/404).
+  * **Out-of-Order Arrival Timestamps**: Arrival timestamps (`arrivalTimestamp`) are deliberately shuffled independently of the business payment dates (`paymentDate`) to simulate asynchronous distributed queue processing.
+
+### 2. High-Throughput Replay Engine (`scripts/replay-events.ts`)
+* **REST API-Only Financial Ingestion**:
+  * Adheres strictly to the architectural constraint that no repayment data is inserted directly into the database.
+  * All events are transmitted via HTTP `POST /api/repayments` with standard JWT bearer authentication and `Idempotency-Key` headers.
+* **Worker Pool Concurrency**:
+  * Multi-worker async pipeline (8 concurrent workers) delivering high throughput (~180 req/s).
+  * In-process server bootstrap ensures reproducible end-to-end execution without manual daemon dependencies.
+* **Execution Telemetry & Reporting**:
+  * Tracks real-time status code distribution (`200 OK`, `201 Created`, `400 Bad Request`, `404 Not Found`, `409 Conflict`, `500 Internal Server Error`).
+  * Computes min, avg, p95, and max request latencies, generating both machine-readable JSON (`reports/replay-report.json`) and formatted text summary (`reports/replay-report.txt`).
+
+### 3. Comprehensive Ledger Reconciliation (`scripts/verify-ledger.ts`)
+The reconciliation engine runs independently post-replay, querying the live MySQL database to assert **9 core invariants**:
+
+1. **Total Input Events Verification**: Confirms exactly 5,000 events were processed by the replay engine.
+2. **Duplicate Request Idempotency**: Audits all 500 retry keys to ensure exactly 1 database repayment record and 1 ledger transaction exist per key (zero duplicate postings).
+3. **Per-Transaction Double-Entry Balance**: Validates that every individual `LedgerTransaction` has $\sum \text{Debit} \equiv \sum \text{Credit}$.
+4. **Global Trial Balance Reconciliation**: Calculates system-wide trial balance across all asset, liability, equity, income, and expense accounts, asserting $\Delta = 0$ paise.
+5. **Non-Negative Outstanding Principal**: Verifies that no loan has a negative outstanding balance ($\text{Disbursed} - \text{Repaid Principal} \ge 0$).
+6. **Accrual Idempotency**: Verifies zero duplicate records in `accrual_records` for any `(scheduleId, accrualDate, accrualType)` tuple.
+7. **Transactional Atomicity**: Asserts zero unposted ledger entries or unposted transactions exist in the database.
+8. **Repayment Allocation Completeness**: Validates that every repayment record's `amountPaise` exactly equals the sum of its associated principal, interest, and penalty allocations.
+9. **Waterfall Policy & Schedule Integrity**: Asserts that under out-of-order event arrivals, payments are consistently allocated oldest-first to penalties, accrued interest, and principal without corrupting installment sequences.
+
+
 
 
 

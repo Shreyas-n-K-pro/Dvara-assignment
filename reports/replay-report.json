@@ -1,0 +1,982 @@
+{
+  "summary": {
+    "startedAt": "2026-11-14T12:58:59.232Z",
+    "completedAt": "2026-11-14T12:59:27.271Z",
+    "durationSeconds": 27.87,
+    "totalEvents": 5000,
+    "concurrency": 8,
+    "statusCodes": {
+      "200": 4058,
+      "201": 588,
+      "400": 254,
+      "404": 50,
+      "409": 50
+    },
+    "scenarioBreakdown": {
+      "VALID_PARTIAL": {
+        "total": 1878,
+        "matched": 1827,
+        "failed": 51
+      },
+      "VALID_ODD_AMOUNT": {
+        "total": 617,
+        "matched": 615,
+        "failed": 2
+      },
+      "VALID_REGULAR": {
+        "total": 1338,
+        "matched": 1264,
+        "failed": 74
+      },
+      "DUPLICATE_RETRY": {
+        "total": 500,
+        "matched": 500,
+        "failed": 0
+      },
+      "VALID_PREPAYMENT": {
+        "total": 467,
+        "matched": 440,
+        "failed": 27
+      },
+      "CONFLICT_KEY": {
+        "total": 50,
+        "matched": 50,
+        "failed": 0
+      },
+      "INVALID_NEGATIVE": {
+        "total": 50,
+        "matched": 50,
+        "failed": 0
+      },
+      "INVALID_ZERO": {
+        "total": 50,
+        "matched": 50,
+        "failed": 0
+      },
+      "INVALID_LOAN": {
+        "total": 50,
+        "matched": 50,
+        "failed": 0
+      }
+    },
+    "throughputRps": 179.4,
+    "latency": {
+      "minMs": 4,
+      "maxMs": 2202,
+      "avgMs": 44,
+      "p50Ms": 13,
+      "p95Ms": 152,
+      "p99Ms": 648
+    },
+    "metrics": {
+      "successfulPayments": 4646,
+      "idempotentReplays": 4058,
+      "conflictsCaught": 50,
+      "validationRejections": 254,
+      "notFoundRejections": 50,
+      "unexpectedErrors": 0
+    }
+  },
+  "resultsSample": [
+    {
+      "eventId": "EVT-0001",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 67,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0002",
+      "scenarioType": "VALID_ODD_AMOUNT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 74,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0003",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 74,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0004",
+      "scenarioType": "VALID_ODD_AMOUNT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 80,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0005",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 81,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0006",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 39,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0007",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 31,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0008",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 75,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0009",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 38,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0010",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 33,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0011",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 30,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0012",
+      "scenarioType": "VALID_ODD_AMOUNT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 33,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0013",
+      "scenarioType": "VALID_ODD_AMOUNT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 31,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0014",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 30,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0015",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 21,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0016",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 20,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0017",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 18,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0018",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 18,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0019",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 18,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0020",
+      "scenarioType": "VALID_PREPAYMENT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 18,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0021",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 18,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0022",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 18,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0023",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 18,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0024",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 22,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0025",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 17,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0026",
+      "scenarioType": "VALID_PREPAYMENT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 17,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0027",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 16,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0028",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 17,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0029",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 17,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0030",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 16,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0031",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 16,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0032",
+      "scenarioType": "VALID_ODD_AMOUNT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0033",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0034",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0035",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0036",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0037",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0038",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0039",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0040",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0041",
+      "scenarioType": "VALID_ODD_AMOUNT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0042",
+      "scenarioType": "VALID_PREPAYMENT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0043",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0044",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0045",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0046",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0047",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0048",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0049",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0050",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0051",
+      "scenarioType": "VALID_ODD_AMOUNT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0052",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 20,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0053",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0054",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 20,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0055",
+      "scenarioType": "VALID_ODD_AMOUNT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 19,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0056",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 20,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0057",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0058",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 20,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0059",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 21,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0060",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 20,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0061",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0062",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0063",
+      "scenarioType": "VALID_ODD_AMOUNT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0064",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 16,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0065",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0066",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 13,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0067",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0068",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 17,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0069",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0070",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0071",
+      "scenarioType": "VALID_ODD_AMOUNT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0072",
+      "scenarioType": "VALID_PREPAYMENT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 16,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0073",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 16,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0074",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 17,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0075",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 17,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0076",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 16,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0077",
+      "scenarioType": "VALID_PREPAYMENT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 17,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0078",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0079",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0080",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0081",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0082",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0083",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 13,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0084",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0085",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 13,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0086",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 13,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0087",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 13,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0088",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0089",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 13,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0090",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 13,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0091",
+      "scenarioType": "VALID_PREPAYMENT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 13,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0092",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0093",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0094",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0095",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0096",
+      "scenarioType": "VALID_REGULAR",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 12,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0097",
+      "scenarioType": "VALID_PREPAYMENT",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0098",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0099",
+      "scenarioType": "DUPLICATE_RETRY",
+      "expectedStatus": 200,
+      "actualStatus": 200,
+      "latencyMs": 17,
+      "isMatch": true,
+      "isCached": true
+    },
+    {
+      "eventId": "EVT-0100",
+      "scenarioType": "VALID_PARTIAL",
+      "expectedStatus": 201,
+      "actualStatus": 200,
+      "latencyMs": 15,
+      "isMatch": true,
+      "isCached": true
+    }
+  ]
+}

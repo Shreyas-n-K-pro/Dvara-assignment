@@ -262,6 +262,57 @@ The service uses 13 interconnected entities implementing a complete loan lifecyc
 - **Database-Level Idempotency**: Enforced by unique constraint `UNIQUE (scheduleId, accrualDate, accrualType)`; repeated scheduler runs or process restarts produce zero duplicates.
 - **Thread-Safe Mutex & Row Locks**: Serializes concurrent scheduler executions using `SELECT ... FOR UPDATE` row locks and in-memory execution guards.
 
+## Synthetic Dataset Generation, Replay & Ledger Reconciliation (Phase 8)
+
+### 1. Synthetic Dataset Generator (`scripts/generate-dataset.ts`)
+- **Deterministic Pseudo-Random Generation**: Uses a seeded PRNG (`seed = 42`) for 100% reproducible test artifacts.
+- **Entity Population**: Generates 300 fictional borrowers across India, 3 standard loan products (`Weekly Group Loan`, `Monthly EMI Loan`, `Flat Rate Loan`), and 300 disbursed synthetic loans with full amortization schedules.
+- **Event Distribution (5,000 Total Events)**:
+  - **4,300 Unique Valid Events**: Realistic loan repayment amounts adhering to schedule installments and partial payments.
+  - **500 Identical Retry Events**: Deliberate duplicates sharing identical `idempotencyKey` and identical request payloads to verify idempotent replays (HTTP 200).
+  - **50 Key-Conflict Events**: Re-using existing keys with modified payment amounts/dates to test HTTP 409 conflict detection.
+  - **150 Invalid Scenario Events**: Intentionally malformed requests (non-existent loans, negative/zero amounts, closed loans, invalid dates) to verify input validation (HTTP 400/404).
+  - **Deliberate Out-of-Order Arrivals**: System arrival timestamps (`arrivalTimestamp`) are shuffled independently of event payment dates (`paymentDate`) to test real-world distributed network arrival order.
+
+Run dataset generation:
+```bash
+npm run generate:dataset
+```
+Output artifact: `data/synthetic-dataset.json`
+
+### 2. High-Throughput Replay Engine (`scripts/replay-events.ts`)
+- **Live HTTP Execution**: Replays all 5,000 synthetic repayment events against the live Express REST API (`POST /api/repayments`) with authentication headers and idempotency keys.
+- **Worker Pool Concurrency**: Concurrent execution via a configurable worker pool (8 workers) simulating concurrent client requests.
+- **Automated Bootstrap & Seeding**: Boots the in-process server, logs in as `MANAGER`, seeds products, borrowers, loans, and schedules before initiating the event replay stream.
+- **Execution Telemetry**: Captures min/avg/p95/max latency, HTTP response codes, and throughput metrics.
+
+Run event replay:
+```bash
+npm run replay:events
+```
+Output artifacts:
+- `reports/replay-report.json`
+- `reports/replay-report.txt`
+
+### 3. Post-Replay Ledger Reconciliation (`scripts/verify-ledger.ts`)
+Rigorous post-execution audit validating financial correctness and double-entry accounting integrity across **9 core invariants**:
+
+1. **Total Input Events Verification**: Confirms all 5,000 generated events were processed.
+2. **Duplicate Request Idempotency**: Verifies zero double-postings across all 500 retry keys.
+3. **Per-Transaction Double-Entry Balance**: Validates $\sum \text{Debit} \equiv \sum \text{Credit}$ on every single transaction in `ledger_transactions`.
+4. **Global Trial Balance Reconciliation**: Confirms net difference between all system debits and credits is exactly 0 paise ($\sum \text{Assets} + \sum \text{Expenses} = \sum \text{Liabilities} + \sum \text{Equity} + \sum \text{Income}$).
+5. **Non-Negative Outstanding Principal**: Verifies zero loans have negative remaining principal balances.
+6. **Accrual Idempotency**: Verifies zero duplicate accrual records for any (schedule, date, type) tuple.
+7. **Transactional Atomicity**: Verifies no orphaned unposted entries or dangling transactions.
+8. **Repayment Allocation Completeness**: Validates that $\text{repayment.amountPaise} \equiv \sum (\text{principal} + \text{interest} + \text{penalty})$ across all repayment records.
+9. **Waterfall Policy & Schedule Integrity**: Confirms payments strictly follow penalties $\to$ interest $\to$ principal waterfall prioritizing oldest overdue installments under out-of-order event arrivals.
+
+Run reconciliation audit:
+```bash
+npm run verify:ledger
+```
+Output artifact: `reports/reconciliation-report.json`
+
 ## API Endpoints
 
 ### Available Endpoints

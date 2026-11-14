@@ -8,8 +8,8 @@
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "test": "jest --forceExit --detectOpenHandles",
-    "test:unit": "jest --testPathPattern=tests/unit --forceExit",
-    "test:integration": "jest --testPathPattern=tests/integration --forceExit --detectOpenHandles",
+    "test:unit": "jest tests/unit --forceExit",
+    "test:integration": "jest tests/integration --forceExit --detectOpenHandles",
     "test:coverage": "jest --coverage --forceExit --detectOpenHandles",
     "lint": "eslint src/",
     "prisma:generate": "prisma generate",
@@ -19,7 +19,10 @@
     "prisma:studio": "prisma studio",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "setup": "npm run docker:up && timeout /t 10 && npm run prisma:migrate && npm run prisma:seed"
+    "setup": "npm run docker:up && timeout /t 10 && npm run prisma:migrate && npm run prisma:seed",
+    "generate:dataset": "ts-node scripts/generate-dataset.ts",
+    "replay:events": "ts-node scripts/replay-events.ts",
+    "verify:ledger": "ts-node scripts/verify-ledger.ts"
   },
   "repository": {
     "type": "git",

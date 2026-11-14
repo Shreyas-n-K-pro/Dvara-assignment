@@ -17,6 +17,7 @@ describe('Loan Product Validation & Rules', () => {
     maxAmountPaise: 50000000n, // ₹5,00,000
     penaltyRateBps: 200,
     processingFeeBps: 100,
+    gracePeriodDays: 3,
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
