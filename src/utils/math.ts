@@ -151,3 +151,15 @@ export function rupeesToPaise(rupees: string | number): bigint {
   const result = BigInt(wholePart) * 100n + BigInt(fractionPart);
   return isNegative ? -result : result;
 }
+
+// Ensure BigInt serializes to string in JSON.stringify / Express res.json()
+declare global {
+  interface BigInt {
+    toJSON(): string;
+  }
+}
+
+(BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function (): string {
+  return this.toString();
+};
+

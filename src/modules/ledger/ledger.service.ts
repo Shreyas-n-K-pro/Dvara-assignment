@@ -22,6 +22,7 @@ import {
   PostTransactionDto,
   AccountBalance,
   LoanOutstandingBalance,
+  LoanBalance,
   TrialBalanceReport,
   TrialBalanceAccountSummary,
   LedgerTransactionWithEntries,
@@ -328,6 +329,23 @@ export class LedgerService {
       totalOutstandingPaise: principalOutstanding + interestOutstanding + penaltyOutstanding,
     };
   }
+
+  /**
+   * Convenience helper to get loan balances in concise LoanBalance format.
+   */
+  async getLoanBalances(
+    loanId: string,
+    tx?: Prisma.TransactionClient
+  ): Promise<LoanBalance> {
+    const res = await this.getLoanOutstanding(loanId, undefined, tx);
+    return {
+      principalOutstanding: res.principalOutstandingPaise,
+      interestOutstanding: res.interestOutstandingPaise,
+      penaltyOutstanding: res.penaltyOutstandingPaise,
+      totalOutstanding: res.totalOutstandingPaise,
+    };
+  }
+
 
   /**
    * 6. Generates a complete Trial Balance report and verifies that:

@@ -1,2 +1,2 @@
-// Loans module - placeholder for Phase 2+
-export {};
+export * from './loan.controller';
+export { default as loanRoutes } from './loan.routes';

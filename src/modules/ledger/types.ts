@@ -1,8 +1,11 @@
 import { LedgerAccountType, EntryType, LedgerTransaction, LedgerEntry } from '@prisma/client';
 
+export { LedgerAccountType, EntryType };
+
 export type LedgerTransactionWithEntries = LedgerTransaction & {
   entries: LedgerEntry[];
 };
+
 
 export interface CreateAccountDto {
   name: string;
@@ -46,6 +49,14 @@ export interface LoanOutstandingBalance {
   penaltyOutstandingPaise: bigint;
   totalOutstandingPaise: bigint;
 }
+
+export interface LoanBalance {
+  principalOutstanding: bigint;
+  interestOutstanding: bigint;
+  penaltyOutstanding: bigint;
+  totalOutstanding: bigint;
+}
+
 
 export interface TrialBalanceAccountSummary {
   accountId: string;

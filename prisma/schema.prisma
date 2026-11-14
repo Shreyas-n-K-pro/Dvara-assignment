@@ -288,6 +288,7 @@ enum EntryType {
 model IdempotencyKey {
   id           String    @id @default(uuid())
   key          String    @unique
+  requestHash  String?
   response     Json?     // Cached response
   statusCode   Int?
   expiresAt    DateTime

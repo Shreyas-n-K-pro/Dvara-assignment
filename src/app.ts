@@ -5,6 +5,8 @@ import helmet from 'helmet';
 import { errorHandler, requestLogger } from './middleware';
 import { config } from './config';
 import { NotFoundError } from './utils';
+import { repaymentRoutes } from './modules/repayments';
+import { loanRoutes } from './modules/loans';
 
 const app = express();
 
@@ -41,6 +43,12 @@ app.get('/api/v1', (_req, res) => {
     },
   });
 });
+
+// Repayments and Loans routes
+app.use('/api/repayments', repaymentRoutes);
+app.use('/api/loans', loanRoutes);
+app.use('/api/v1/repayments', repaymentRoutes);
+app.use('/api/v1/loans', loanRoutes);
 
 // 404 handler for unmatched routes
 app.use((_req, _res, next) => {

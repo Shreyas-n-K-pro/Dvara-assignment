@@ -232,3 +232,31 @@ Calculated by summing entries tagged with the given `loanId`:
 * For every entry in the original transaction, an exact contra-entry is generated (`DEBIT` $\leftrightarrow$ `CREDIT`).
 * Both original and reversal transactions are permanently marked as reversed (`isReversed = true`), guaranteeing idempotent, single-reversal invariants.
 
+---
+
+## Phase 4: Repayment Management & Idempotency Engine
+
+### 1. Architectural Overview
+Phase 4 implements the end-to-end payment processing pipeline, integrating the double-entry accounting ledger with strict ACID transactions, priority waterfall allocations, and canonical request-hash idempotency controls.
+
+### 2. Repayment Waterfall Allocation
+Payments are applied strictly across outstanding schedules prioritized by oldest due installment (`installmentNumber ASC` where status is not `PAID`):
+1. **Penalties**: Outstanding penalties are satisfied first.
+2. **Accrued Interest**: Installment interest components are satisfied second.
+3. **Principal**: Installment principal components are satisfied third.
+
+Installment status automatically updates:
+* `PAID`: When both principal and interest components are fully satisfied.
+* `PARTIALLY_PAID`: When at least one paise has been applied but balance remains.
+* `CLOSED`: When total loan principal, interest, and penalties reach 0 paise, the loan status updates to `CLOSED` and `closedAt` is timestamped.
+
+### 3. Canonical Request Hashing & Idempotency Lifecycle
+1. **Header Requirement**: Clients must provide the `Idempotency-Key` HTTP header.
+2. **Canonical Hashing**: Request method, normalized path, and lexicographically sorted JSON payload are digested using SHA-256.
+3. **Replay Invariant**:
+   * Same Key + Identical Request Hash $\to$ Returns cached HTTP response payload (HTTP 200/201).
+   * Same Key + Modified Request $\to$ Rejects with HTTP 409 Conflict.
+4. **Atomicity Guarantee**: `IdempotencyKey`, `Repayment`, `RepaymentAllocation`, `RepaymentSchedule` status updates, `LedgerTransaction`, `LedgerEntry`, and `AuditLog` records commit atomically inside `prisma.$transaction`.
+5. **Rollback Safety**: Any operational failure triggers an immediate database-level rollback; no partial postings, dirty balances, or orphan idempotency records remain.
+
+

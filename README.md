@@ -229,14 +229,17 @@ The service uses 13 interconnected entities implementing a complete loan lifecyc
 
 ## API Endpoints
 
-### Available Now
+### Available Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Health check |
-| GET | `/api/v1` | API information |
+| Method | Path | Header | Description |
+|--------|------|--------|-------------|
+| GET | `/health` | - | Health check |
+| GET | `/api/v1` | - | API metadata |
+| POST | `/api/repayments` | `Idempotency-Key` (required) | Process loan repayment with waterfall allocation and atomic double-entry ledger posting |
+| GET | `/api/repayments/:id` | - | Retrieve repayment details, schedule allocations, and idempotency status |
+| GET | `/api/loans/:id/balance` | - | Retrieve derived outstanding balances (principal, interest, penalty, total) |
+| GET | `/api/loans/:id/schedule` | - | Retrieve repayment installment schedule with paid and remaining balances |
 
-*Additional endpoints will be added in subsequent phases.*
 
 ## Environment Variables
 
