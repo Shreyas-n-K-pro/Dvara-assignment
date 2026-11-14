@@ -153,6 +153,26 @@ curl http://localhost:3000/api/v1
 | `npm run docker:up` | Start MySQL container |
 | `npm run docker:down` | Stop MySQL container |
 
+## Supported Loan Products (Phase 2)
+
+The engine provides 3 core loan products:
+
+| Product | Frequency | Interest Type | Default Rate | Tenure Range | Amount Range |
+|---------|-----------|---------------|--------------|--------------|--------------|
+| **Weekly Group Loan** | `WEEKLY` | `FLAT` | 1500 bps (15.00%) | 12 to 52 weeks | ₹5,000 to ₹1,00,000 |
+| **Monthly EMI Loan** | `MONTHLY` | `REDUCING_BALANCE` | 1200 bps (12.00%) | 6 to 60 months | ₹20,000 to ₹10,00,000 |
+| **Flat Rate Loan** | `MONTHLY` | `FLAT` | 1400 bps (14.00%) | 3 to 36 months | ₹10,000 to ₹5,00,000 |
+
+### Financial Calculation Engine Guarantees
+
+- **No Floating-Point Math:** All calculations use integer paise (`BigInt`).
+- **Half-Up Rounding:** Rounding follows strict half-up rules ($\ge 0.5$ paise rounds up).
+- **Exact Schedule Reconciliation:**
+  $$\sum \text{principalPaise} \equiv \text{originalPrincipalPaise}$$
+  $$\sum \text{interestPaise} \equiv \text{totalCalculatedInterestPaise}$$
+  $$\text{principalPaise}_i + \text{interestPaise}_i \equiv \text{totalPaise}_i \quad \forall i$$
+- **Calendar & Month-End Handling:** Safe UTC handling with month-end date clamping (e.g. Jan 31 $\to$ Feb 28/29 $\to$ Mar 31).
+
 ## Database Schema
 
 The service uses 13 interconnected entities implementing a complete loan lifecycle with double-entry accounting:

@@ -46,6 +46,103 @@ Every repayment request carries a unique idempotency key. Before processing:
 
 `Loan` and `RepaymentSchedule` tables include a `version` column. Updates use a `WHERE version = expectedVersion` clause. If the version has changed (concurrent modification), the operation fails and can be retried with fresh data.
 
+---
+
+## Loan Products & Repayment Calculation Engine (Phase 2)
+
+### Supported Loan Products
+
+1. **Weekly Group Loan**
+   - Repayment Frequency: `WEEKLY`
+   - Interest Type: `FLAT`
+   - Annual Rate: Stored in basis points (e.g., 1500 bps = 15.00% p.a.)
+   - Typical Tenure: 12 to 52 weeks
+   - Target Segment: Joint-liability microfinance groups
+
+2. **Monthly EMI Loan**
+   - Repayment Frequency: `MONTHLY`
+   - Interest Type: `REDUCING_BALANCE`
+   - Annual Rate: Stored in basis points (e.g., 1200 bps = 12.00% p.a.)
+   - Typical Tenure: 6 to 60 months
+   - Target Segment: Individual retail and enterprise borrowers
+
+3. **Flat Rate Loan**
+   - Repayment Frequency: `MONTHLY`
+   - Interest Type: `FLAT`
+   - Annual Rate: Stored in basis points (e.g., 1400 bps = 14.00% p.a.)
+   - Typical Tenure: 3 to 36 months
+   - Target Segment: Short-term seasonal working capital
+
+---
+
+### Strict BigInt Financial Arithmetic
+
+JavaScript `Number` (IEEE 754 double precision) introduces cumulative rounding errors in financial transactions.
+To prevent this:
+- **Zero floating-point arithmetic is permitted for monetary calculations.**
+- All money amounts are stored and calculated as integer **paise** using TypeScript `BigInt` ($1\text{ INR} = 100\text{ paise}$).
+- Interest rates are expressed in integer **basis points** ($1\% = 100\text{ bps}$, $12.50\% = 1250\text{ bps}$).
+
+#### Exact Half-Up Rounding Formula
+For numerator $n \ge 0$ and denominator $d > 0$:
+$$\text{roundHalfUp}\left(\frac{n}{d}\right) = \left\lfloor \frac{2n + d}{2d} \right\rfloor$$
+This formula computes exact half-up rounding (where fractions $\ge 0.5$ round up) using purely integer division without intermediate floating-point casting.
+
+---
+
+### Amortization & Repayment Formulas
+
+#### 1. Flat-Rate Calculation
+- **Total Interest:**
+  $$\text{totalInterestPaise} = \text{roundHalfUp}\left(\frac{P \times R_{\text{bps}} \times n}{\text{periodicDenominator}}\right)$$
+  Where:
+  - $\text{periodicDenominator} = 120,000$ for Monthly ($10,000 \times 12$)
+  - $\text{periodicDenominator} = 520,000$ for Weekly ($10,000 \times 52$)
+- **Distribution:**
+  - Base principal: $\text{roundHalfUp}(P / n)$
+  - Base interest: $\text{roundHalfUp}(\text{totalInterestPaise} / n)$
+  - Installment $i \in [1, n-1]$: receives base principal and base interest.
+  - Final installment $n$: absorbs any rounding difference:
+    $$\text{principal}_n = P - \sum_{i=1}^{n-1} \text{principal}_i$$
+    $$\text{interest}_n = \text{totalInterestPaise} - \sum_{i=1}^{n-1} \text{interest}_i$$
+  - Guaranteed: $\sum_{i=1}^n \text{principal}_i = P$ and $\sum_{i=1}^n \text{interest}_i = \text{totalInterestPaise}$.
+
+#### 2. Reducing-Balance EMI Calculation
+The standard banking EMI formula:
+$$E = P \cdot \frac{r(1+r)^n}{(1+r)^n - 1}$$
+Where periodic rate $r = \frac{R_{\text{bps}}}{\text{periodicDenominator}} = \frac{num_r}{B}$.
+Let $A = B + num_r$ (so $A/B = 1+r$).
+In closed-form integer arithmetic:
+$$E = P \cdot \frac{(A - B) \cdot A^n}{B \cdot (A^n - B^n)}$$
+- Outstanding balance begins at $O_0 = P$.
+- For each installment $i \in [1, n-1]$:
+  - $\text{interest}_i = \text{roundHalfUp}\left(\frac{O_{i-1} \times R_{\text{bps}}}{\text{periodicDenominator}}\right)$
+  - $\text{principal}_i = E - \text{interest}_i$
+  - $O_i = O_{i-1} - \text{principal}_i$
+- For final installment $n$:
+  - $\text{principal}_n = O_{n-1}$ (pays off all remaining balance)
+  - $\text{interest}_n = \text{roundHalfUp}\left(\frac{O_{n-1} \times R_{\text{bps}}}{\text{periodicDenominator}}\right)$
+  - $O_n = 0\text{ paise}$.
+- Telescoping sum guarantees: $\sum_{i=1}^n \text{principal}_i = P$ exactly.
+
+---
+
+### Calendar Date Handling
+- **Weekly Repayments:** Due dates advance in exact 7-day increments using UTC arithmetic.
+- **Monthly Repayments:** Anchored to original loan start day; automatically clamped to the last day of the target month (e.g., Jan 31 $\to$ Feb 28/29 $\to$ Mar 31) and restored in subsequent 31-day months.
+
+---
+
+### Schedule Reconciliation Engine
+Every generated schedule undergoes reconciliation before persistence:
+1. $\sum \text{principalPaise} \equiv \text{originalPrincipalPaise}$
+2. $\text{principalPaise}_i + \text{interestPaise}_i \equiv \text{totalPaise}_i$ for every installment
+3. $\sum \text{principalPaise} + \sum \text{interestPaise} \equiv \sum \text{totalPaise}$
+4. $\text{finalOutstandingPrincipal} \equiv 0\text{ paise}$
+5. No negative monetary values allowed.
+
+---
+
 ## Transaction Strategy
 
 ### Prisma Interactive Transactions
@@ -59,7 +156,6 @@ await prisma.$transaction(async (tx) => {
   const allocation = await tx.repaymentAllocation.create({ ... });
   const ledgerTx = await tx.ledgerTransaction.create({ ... });
   await tx.ledgerEntry.createMany({ ... });
-  // If any operation fails, everything rolls back
 });
 ```
 
@@ -76,34 +172,6 @@ await prisma.$transaction(async (tx) => {
 
 MySQL InnoDB defaults to `REPEATABLE READ`, ensuring consistent reads within a transaction. For balance calculations during repayment processing, `SELECT ... FOR UPDATE` is used to acquire row-level locks on relevant ledger accounts.
 
-## Monetary Precision
-
-All monetary values are stored as `BigInt` (MySQL `BIGINT`) in **paise** (the smallest unit of Indian Rupee):
-
-- ₹1,234.56 → stored as `123456`
-- ₹0.01 → stored as `1`
-
-This avoids floating-point arithmetic errors entirely. All calculations are done in integer arithmetic, and conversion to rupees happens only at the API response layer.
-
-Interest rates are stored in **basis points** (1/100th of a percent):
-
-- 12.50% → stored as `1250`
-- 0.05% → stored as `5`
-
-## Entity Relationships
-
-```
-User ──┬── creates → Borrower ── takes → Loan ──┬── has → RepaymentSchedule
-       │                                         ├── receives → Repayment → splits → RepaymentAllocation
-       │                                         ├── owns → LedgerAccount → has → LedgerEntry
-       │                                         └── accrues → AccrualRecord
-       └── triggers → AuditLog
-
-LoanProduct ── defines → Loan
-LedgerTransaction ── groups → LedgerEntry[]
-Repayment ── uses → IdempotencyKey
-```
-
 ## Deletion Policies
 
 | Parent → Child | Policy | Rationale |
@@ -118,24 +186,3 @@ Repayment ── uses → IdempotencyKey
 | LedgerAccount → LedgerEntry | RESTRICT | Cannot delete account with entries |
 | LedgerTransaction → LedgerEntry | CASCADE | Entries belong to transaction |
 | User → AuditLog | SetNull | Preserve audit trail if user deleted |
-
-## Error Handling
-
-The application uses a centralized error handling architecture:
-
-1. **Custom error classes** (`AppError`, `NotFoundError`, `ValidationError`, etc.) with HTTP status codes and error codes
-2. **Express async error handling** via `express-async-errors` – no need for try-catch in route handlers
-3. **Centralized error middleware** catches all errors and returns consistent JSON responses
-4. **Structured logging** with timestamp, level, and metadata
-
-## Folder Structure Rationale
-
-The project follows a **modular architecture** where each business domain has its own directory under `src/modules/`. Each module will contain:
-
-- `*.controller.ts` – HTTP request handling
-- `*.service.ts` – Business logic
-- `*.routes.ts` – Route definitions
-- `*.validator.ts` – Input validation
-- `*.types.ts` – TypeScript interfaces
-
-This separation enables independent development, testing, and potential future extraction into microservices.

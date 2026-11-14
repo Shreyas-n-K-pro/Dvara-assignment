@@ -1,2 +1,3 @@
-// Products module - placeholder for Phase 2+
-export {};
+export * from './types';
+export * from './predefined';
+export * from './product.service';

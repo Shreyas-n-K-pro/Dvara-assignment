@@ -1,2 +1,2 @@
-// Schedules module - placeholder for Phase 2+
-export {};
+export * from './calculator';
+export * from './schedule.service';

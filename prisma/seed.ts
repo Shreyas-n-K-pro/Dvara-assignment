@@ -1,11 +1,11 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, InterestType, RepaymentFrequency } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
   console.log('Starting database seed...');
 
-  // Create default admin user
+  // 1. Create default admin user
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@dvara.com' },
     update: {},
@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   });
   console.log(`Created admin user: ${adminUser.email}`);
 
-  // Create default loan officer
+  // 2. Create default loan officer
   const officerUser = await prisma.user.upsert({
     where: { email: 'officer@dvara.com' },
     update: {},
@@ -31,42 +31,98 @@ async function main(): Promise<void> {
   });
   console.log(`Created officer user: ${officerUser.email}`);
 
-  // Create sample loan products
-  const personalLoan = await prisma.loanProduct.upsert({
-    where: { name: 'Personal Loan' },
-    update: {},
+  // 3. Create the three required loan products for Phase 2:
+  // Product 1: Weekly Group Loan – weekly repayment, flat-rate interest.
+  const weeklyGroupLoan = await prisma.loanProduct.upsert({
+    where: { name: 'Weekly Group Loan' },
+    update: {
+      interestType: InterestType.FLAT,
+      repaymentFrequency: RepaymentFrequency.WEEKLY,
+      interestRateBps: 1500, // 15.00% p.a.
+      minTenureMonths: 3,    // ~12 weeks
+      maxTenureMonths: 12,   // ~52 weeks
+      minAmountPaise: BigInt(500000),   // ₹5,000
+      maxAmountPaise: BigInt(10000000), // ₹1,00,000
+      penaltyRateBps: 200,
+      processingFeeBps: 100,
+    },
     create: {
-      name: 'Personal Loan',
-      description: 'Unsecured personal loan for salaried individuals',
-      interestRateBps: 1200, // 12.00%
+      name: 'Weekly Group Loan',
+      description: 'Weekly group lending product with flat-rate interest',
+      interestType: InterestType.FLAT,
+      repaymentFrequency: RepaymentFrequency.WEEKLY,
+      interestRateBps: 1500, // 15.00% p.a.
+      minTenureMonths: 3,    // ~12 weeks
+      maxTenureMonths: 12,   // ~52 weeks
+      minAmountPaise: BigInt(500000),   // ₹5,000
+      maxAmountPaise: BigInt(10000000), // ₹1,00,000
+      penaltyRateBps: 200,
+      processingFeeBps: 100,
+    },
+  });
+  console.log(`Created loan product: ${weeklyGroupLoan.name} (${weeklyGroupLoan.interestType}, ${weeklyGroupLoan.repaymentFrequency})`);
+
+  // Product 2: Monthly EMI Loan – monthly repayment, reducing-balance interest.
+  const monthlyEmiLoan = await prisma.loanProduct.upsert({
+    where: { name: 'Monthly EMI Loan' },
+    update: {
+      interestType: InterestType.REDUCING_BALANCE,
+      repaymentFrequency: RepaymentFrequency.MONTHLY,
+      interestRateBps: 1200, // 12.00% p.a.
       minTenureMonths: 6,
       maxTenureMonths: 60,
-      minAmountPaise: BigInt(5000000), // ₹50,000
-      maxAmountPaise: BigInt(200000000), // ₹20,00,000
-      penaltyRateBps: 200, // 2.00%
-      processingFeeBps: 150, // 1.50%
+      minAmountPaise: BigInt(2000000),   // ₹20,000
+      maxAmountPaise: BigInt(100000000), // ₹10,00,000
+      penaltyRateBps: 200,
+      processingFeeBps: 150,
+    },
+    create: {
+      name: 'Monthly EMI Loan',
+      description: 'Standard monthly loan with reducing-balance EMI interest',
+      interestType: InterestType.REDUCING_BALANCE,
+      repaymentFrequency: RepaymentFrequency.MONTHLY,
+      interestRateBps: 1200, // 12.00% p.a.
+      minTenureMonths: 6,
+      maxTenureMonths: 60,
+      minAmountPaise: BigInt(2000000),   // ₹20,000
+      maxAmountPaise: BigInt(100000000), // ₹10,00,000
+      penaltyRateBps: 200,
+      processingFeeBps: 150,
     },
   });
-  console.log(`Created loan product: ${personalLoan.name}`);
+  console.log(`Created loan product: ${monthlyEmiLoan.name} (${monthlyEmiLoan.interestType}, ${monthlyEmiLoan.repaymentFrequency})`);
 
-  const microLoan = await prisma.loanProduct.upsert({
-    where: { name: 'Micro Enterprise Loan' },
-    update: {},
-    create: {
-      name: 'Micro Enterprise Loan',
-      description: 'Small business loan for micro enterprises',
-      interestRateBps: 1500, // 15.00%
+  // Product 3: Flat Rate Loan – monthly repayment, flat-rate interest.
+  const flatRateLoan = await prisma.loanProduct.upsert({
+    where: { name: 'Flat Rate Loan' },
+    update: {
+      interestType: InterestType.FLAT,
+      repaymentFrequency: RepaymentFrequency.MONTHLY,
+      interestRateBps: 1400, // 14.00% p.a.
       minTenureMonths: 3,
       maxTenureMonths: 36,
-      minAmountPaise: BigInt(1000000), // ₹10,000
+      minAmountPaise: BigInt(1000000),  // ₹10,000
       maxAmountPaise: BigInt(50000000), // ₹5,00,000
-      penaltyRateBps: 250, // 2.50%
-      processingFeeBps: 200, // 2.00%
+      penaltyRateBps: 250,
+      processingFeeBps: 200,
+    },
+    create: {
+      name: 'Flat Rate Loan',
+      description: 'Monthly tenure loan with flat-rate interest calculated on original principal',
+      interestType: InterestType.FLAT,
+      repaymentFrequency: RepaymentFrequency.MONTHLY,
+      interestRateBps: 1400, // 14.00% p.a.
+      minTenureMonths: 3,
+      maxTenureMonths: 36,
+      minAmountPaise: BigInt(1000000),  // ₹10,000
+      maxAmountPaise: BigInt(50000000), // ₹5,00,000
+      penaltyRateBps: 250,
+      processingFeeBps: 200,
     },
   });
-  console.log(`Created loan product: ${microLoan.name}`);
+  console.log(`Created loan product: ${flatRateLoan.name} (${flatRateLoan.interestType}, ${flatRateLoan.repaymentFrequency})`);
 
-  // Create system ledger accounts
+  // 4. Create system ledger accounts (idempotent lookup)
   const systemAccounts = [
     { name: 'Cash / Bank', accountType: 'ASSET' as const },
     { name: 'Loans Receivable - Principal', accountType: 'ASSET' as const },
@@ -78,10 +134,15 @@ async function main(): Promise<void> {
   ];
 
   for (const account of systemAccounts) {
-    const created = await prisma.ledgerAccount.create({
-      data: account,
+    const existing = await prisma.ledgerAccount.findFirst({
+      where: { name: account.name, loanId: null },
     });
-    console.log(`Created ledger account: ${created.name} (${created.accountType})`);
+    if (!existing) {
+      const created = await prisma.ledgerAccount.create({ data: account });
+      console.log(`Created ledger account: ${created.name} (${created.accountType})`);
+    } else {
+      console.log(`Ledger account already exists: ${existing.name}`);
+    }
   }
 
   console.log('Database seed completed successfully.');
