@@ -259,4 +259,34 @@ Installment status automatically updates:
 4. **Atomicity Guarantee**: `IdempotencyKey`, `Repayment`, `RepaymentAllocation`, `RepaymentSchedule` status updates, `LedgerTransaction`, `LedgerEntry`, and `AuditLog` records commit atomically inside `prisma.$transaction`.
 5. **Rollback Safety**: Any operational failure triggers an immediate database-level rollback; no partial postings, dirty balances, or orphan idempotency records remain.
 
+---
+
+## Phase 5: Concurrent Repayment Safety & Database Locking
+
+### 1. Database-Level Row Locking (`SELECT ... FOR UPDATE`)
+To prevent concurrent race conditions where two payments might consume the same outstanding balance, the service acquires an exclusive row lock (`X` lock) on the target loan before reading or modifying balances:
+
+```sql
+SELECT * FROM loans WHERE id = ? FOR UPDATE;
+```
+
+This guarantees strict transaction serialization at the MySQL InnoDB engine level.
+
+### 2. Post-Lock Balance Validation
+All balance calculations are performed strictly **after** obtaining the row lock:
+1. Lock `loans` row by `id`.
+2. Check `idempotency_keys` with `FOR UPDATE` to handle in-flight concurrent duplicates.
+3. Fetch derived ledger balances (`getLoanBalances(loan.id, tx)`).
+4. Assert `amountPaise <= balances.totalOutstanding`.
+5. Under concurrent contention, the winning transaction reduces the balance; the waiting transaction unblocks, re-reads the updated committed ledger balance, and either processes the remainder or rejects overpayment with HTTP 400.
+
+### 3. Consistent Lock Hierarchy
+To eliminate deadlock hazards, transactions acquire locks in a deterministic order:
+$$\text{loans (by id)} \longrightarrow \text{idempotency\_keys (by key)} \longrightarrow \text{repayment\_schedules (ORDER BY installmentNumber ASC)}$$
+
+### 4. Bounded Deadlock Retries
+Transient database contention (MySQL error `1213: ER_LOCK_DEADLOCK`, `1205: Lock wait timeout`, or Prisma `P2034`) is resolved using a bounded retry mechanism with exponential backoff and randomized jitter:
+$$\text{backoff} = 50\text{ms} \times 2^{\text{attempt}} + \text{jitter}(0, 50\text{ms}) \quad (\le 5\text{ attempts})$$
+
+
 

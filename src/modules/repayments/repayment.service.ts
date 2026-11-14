@@ -22,12 +22,83 @@ import {
   LoanBalanceResponse,
 } from './types';
 
+interface LockedLoanRow {
+  id: string;
+  loanNumber: string;
+  borrowerId: string;
+  productId: string;
+  interestType: string;
+  repaymentFrequency: string;
+  principalPaise: bigint;
+  interestRateBps: number;
+  tenureMonths: number;
+  disbursedAt: Date | null;
+  closedAt: Date | null;
+  status: LoanStatus;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface LockedIdempotencyRow {
+  id: string;
+  key: string;
+  requestHash: string | null;
+  response: string | Record<string, unknown> | null;
+  statusCode: number | null;
+}
+
 export class RepaymentService {
+  private readonly maxDeadlockRetries = 5;
+  private readonly baseBackoffMs = 50;
+
   /**
-   * Processes a loan repayment atomically with double-entry ledger postings,
-   * waterfall allocation, and strict idempotency controls.
+   * Identifies transient database deadlock or lock wait timeout errors that are safe to retry.
+   */
+  private isRetryableDeadlockError(err: unknown): boolean {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      // P2034: Transaction failed due to a write conflict or a deadlock.
+      if (err.code === 'P2034') return true;
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    return (
+      msg.includes('Deadlock found') ||
+      msg.includes('1213') ||
+      msg.includes('Lock wait timeout') ||
+      msg.includes('1205')
+    );
+  }
+
+  /**
+   * Processes a loan repayment safely under concurrency with database-level row locking
+   * (SELECT FOR UPDATE), deadlock retry loop, waterfall allocation, and strict idempotency.
    */
   async processRepayment(
+    dto: CreateRepaymentDto,
+    idempotencyKey: string,
+    userId?: string
+  ): Promise<RepaymentResponseData> {
+    let attempt = 0;
+    while (true) {
+      try {
+        return await this.executeRepayment(dto, idempotencyKey, userId);
+      } catch (err) {
+        attempt++;
+        if (attempt <= this.maxDeadlockRetries && this.isRetryableDeadlockError(err)) {
+          const jitter = Math.floor(Math.random() * 50);
+          const backoff = this.baseBackoffMs * Math.pow(2, attempt) + jitter;
+          await new Promise((resolve) => setTimeout(resolve, backoff));
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+
+  /**
+   * Internal transactional worker implementing the full repayment workflow under exclusive lock.
+   */
+  private async executeRepayment(
     dto: CreateRepaymentDto,
     idempotencyKey: string,
     userId?: string
@@ -67,7 +138,7 @@ export class RepaymentService {
       paymentReference: dto.paymentReference.trim(),
     });
 
-    // 3. Check existing idempotency key before entering transaction
+    // 3. Fast pre-check: if idempotency key already exists and committed, return immediately
     const existingKey = await prisma.idempotencyKey.findUnique({
       where: { key: idempotencyKey },
     });
@@ -92,15 +163,42 @@ export class RepaymentService {
       // 4. Atomic transaction executing financial workflow
       return await prisma.$transaction(
         async (tx: Prisma.TransactionClient) => {
-          // A. Fetch loan with pessimistic or repeatable-read lock
-          const loan = await tx.loan.findUnique({
-            where: { id: dto.loanId },
-          });
+          // A. REQUIREMENT 1 & 7: Lock the loan row using SELECT ... FOR UPDATE (consistent lock ordering)
+          const lockedLoans = await tx.$queryRaw<LockedLoanRow[]>`
+            SELECT * FROM loans WHERE id = ${dto.loanId} FOR UPDATE
+          `;
 
+          const loan = lockedLoans[0];
           if (!loan) {
             throw new NotFoundError(`Loan with ID '${dto.loanId}' not found`);
           }
 
+          // B. Concurrent Idempotency Check: check if another concurrent transaction committed this key
+          // while this transaction was waiting for the loan lock
+          const lockedKeys = await tx.$queryRaw<LockedIdempotencyRow[]>`
+            SELECT * FROM idempotency_keys WHERE \`key\` = ${idempotencyKey} FOR UPDATE
+          `;
+
+          const existingKeyInTx = lockedKeys[0];
+          if (existingKeyInTx) {
+            if (existingKeyInTx.requestHash && existingKeyInTx.requestHash !== requestHash) {
+              throw new ConflictError(
+                'Idempotency key has already been used with different request parameters'
+              );
+            }
+
+            if (existingKeyInTx.response) {
+              const cached = (typeof existingKeyInTx.response === 'string'
+                ? JSON.parse(existingKeyInTx.response)
+                : existingKeyInTx.response) as RepaymentResponseData;
+              return {
+                ...cached,
+                isCached: true,
+              };
+            }
+          }
+
+          // C. Validate loan status after acquiring exclusive lock
           if (loan.status === LoanStatus.CLOSED) {
             throw new ValidationError('Cannot process repayment for closed loan');
           }
@@ -111,28 +209,28 @@ export class RepaymentService {
             );
           }
 
-          // B. Derive loan outstanding balances from ledger entries
+          // D. REQUIREMENT 2 & 4 & 5: Derive loan outstanding balances AFTER obtaining lock
           const balances = await ledgerService.getLoanBalances(loan.id, tx);
 
           if (balances.totalOutstanding <= 0n) {
             throw new ValidationError('Loan has no outstanding balance');
           }
 
-          // C. Validate overpayment
+          // Validate overpayment under lock: prevents negative balances and prevents double-spending
           if (amountPaise > balances.totalOutstanding) {
             throw new ValidationError(
               `Repayment amount (${amountPaise} paise) exceeds total outstanding balance (${balances.totalOutstanding} paise)`
             );
           }
 
-          // D. Fetch repayment schedules with allocations ordered by installment number
+          // E. REQUIREMENT 7: Fetch repayment schedules ordered consistently by installment number
           const schedules = await tx.repaymentSchedule.findMany({
             where: { loanId: loan.id },
             include: { allocations: true },
             orderBy: { installmentNumber: 'asc' },
           });
 
-          // E. Waterfall allocation:
+          // F. Waterfall allocation:
           // 1. Penalties
           // 2. Accrued Interest
           // 3. Principal
@@ -245,7 +343,7 @@ export class RepaymentService {
             remainingToAllocate = 0n;
           }
 
-          // F. Determine if loan is fully paid off
+          // G. Determine if loan is fully paid off
           const newPrincipalOutstanding: bigint =
             balances.principalOutstanding - totalPrincipalPaid;
           const newInterestOutstanding: bigint =
@@ -270,8 +368,7 @@ export class RepaymentService {
             });
           }
 
-          // G. Double-Entry Accounting Ledger Posting
-          // Get or create required ledger accounts
+          // H. REQUIREMENT 3: Double-Entry Accounting Ledger Posting inside the same transaction
           const cashBank = await ledgerService.getOrCreateSystemAccount(
             'Cash and Bank',
             'ASSET',
@@ -320,7 +417,7 @@ export class RepaymentService {
               : balances.penaltyOutstanding;
           const penaltyDirect: bigint = totalPenaltyPaid - penaltyAccrued;
 
-          // Build balanced entries
+          // Build balanced entries: SUM(DEBIT) === SUM(CREDIT)
           const ledgerEntries: Array<{
             ledgerAccountId: string;
             entryType: EntryType;
@@ -388,7 +485,7 @@ export class RepaymentService {
             tx
           );
 
-          // H. Create Idempotency Key record inside the transaction
+          // I. Create Idempotency Key record inside the transaction
           const idempotencyRecord = await tx.idempotencyKey.create({
             data: {
               key: idempotencyKey,
@@ -397,7 +494,7 @@ export class RepaymentService {
             },
           });
 
-          // I. Create Repayment record
+          // J. Create Repayment record
           const repayment = await tx.repayment.create({
             data: {
               loanId: loan.id,
@@ -409,7 +506,7 @@ export class RepaymentService {
             },
           });
 
-          // J. Create Repayment Allocations
+          // K. Create Repayment Allocations
           if (allocationsToCreate.length > 0) {
             await tx.repaymentAllocation.createMany({
               data: allocationsToCreate.map((a) => ({
@@ -422,7 +519,7 @@ export class RepaymentService {
             });
           }
 
-          // K. Create Audit Log
+          // L. Create Audit Log
           await tx.auditLog.create({
             data: {
               userId: userId ?? null,
@@ -455,7 +552,7 @@ export class RepaymentService {
             },
           });
 
-          // L. Prepare final response
+          // M. Prepare final response
           const responseData: RepaymentResponseData = {
             repayment: {
               id: repayment.id,
@@ -490,7 +587,7 @@ export class RepaymentService {
             isCached: false,
           };
 
-          // M. Cache response in IdempotencyKey
+          // N. Cache response in IdempotencyKey
           await tx.idempotencyKey.update({
             where: { id: idempotencyRecord.id },
             data: {

@@ -188,6 +188,18 @@ The ledger subsystem enforces strict double-entry bookkeeping rules:
    $$\sum_{\text{all}} \text{Debits} \equiv \sum_{\text{all}} \text{Credits}$$
 5. **Configurable Accounting Policies:** Declarative policy driving disbursements, repayments, interest accruals, and penalty accruals.
 
+## Repayment Management & Concurrency Safety (Phases 4 & 5)
+
+### Core Features
+- **Idempotent REST API:** `POST /api/repayments` with mandatory `Idempotency-Key` header and canonical SHA-256 request hashing.
+- **Waterfall Allocation:** Prioritizes oldest outstanding installments (`installmentNumber ASC`):
+  1. Penalties $\to$ 2. Accrued Interest $\to$ 3. Principal
+- **Database-Level Row Locking (`SELECT ... FOR UPDATE`):** Acquires exclusive locks on target loan rows to serialize concurrent repayments and prevent race conditions.
+- **Post-Lock Balance Validation:** Validates derived balances after obtaining lock, guaranteeing zero over-consumption and preventing negative balances.
+- **Deadlock Resilience:** Automatically handles transient database deadlocks with bounded exponential backoff retries and randomized jitter.
+- **Atomic Operations:** Repayment, allocations, ledger entries, schedule updates, idempotency record, and audit log commit atomically in a single transaction.
+
+
 
 ## Database Schema
 
