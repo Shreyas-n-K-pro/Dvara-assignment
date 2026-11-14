@@ -173,6 +173,22 @@ The engine provides 3 core loan products:
   $$\text{principalPaise}_i + \text{interestPaise}_i \equiv \text{totalPaise}_i \quad \forall i$$
 - **Calendar & Month-End Handling:** Safe UTC handling with month-end date clamping (e.g. Jan 31 $\to$ Feb 28/29 $\to$ Mar 31).
 
+## Double-Entry Accounting Ledger (Phase 3)
+
+The ledger subsystem enforces strict double-entry bookkeeping rules:
+
+### Core Capabilities
+1. **Atomic Transaction Posting:** Every ledger transaction guarantees $\sum \text{DEBIT} \equiv \sum \text{CREDIT}$. Rejects any unbalanced, zero, negative, or invalid-account postings.
+2. **Derived Balance Engine:** Neither loans nor accounts store authoritative mutable balances. Balances are derived dynamically:
+   - **Assets & Expenses:** $\text{Debits} - \text{Credits}$
+   - **Liabilities, Income & Equity:** $\text{Credits} - \text{Debits}$
+   - **Loan Outstanding:** $\text{Principal Outstanding} + \text{Interest Outstanding} + \text{Penalty Outstanding}$
+3. **Transaction Reversals:** Posted entries are immutable. Errors are corrected exclusively via compensating contra-reversal transactions (`isReversed = true`, referencing `reversalOfId`).
+4. **Trial Balance Verification:** Verification engine ensuring global ledger integrity:
+   $$\sum_{\text{all}} \text{Debits} \equiv \sum_{\text{all}} \text{Credits}$$
+5. **Configurable Accounting Policies:** Declarative policy driving disbursements, repayments, interest accruals, and penalty accruals.
+
+
 ## Database Schema
 
 The service uses 13 interconnected entities implementing a complete loan lifecycle with double-entry accounting:

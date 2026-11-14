@@ -186,3 +186,49 @@ MySQL InnoDB defaults to `REPEATABLE READ`, ensuring consistent reads within a t
 | LedgerAccount → LedgerEntry | RESTRICT | Cannot delete account with entries |
 | LedgerTransaction → LedgerEntry | CASCADE | Entries belong to transaction |
 | User → AuditLog | SetNull | Preserve audit trail if user deleted |
+
+---
+
+## Phase 3: Double-Entry Accounting Ledger
+
+### 1. Architectural Principles
+1. **Mathematical Balance Guarantee**: Every posted transaction satisfies $\sum \text{Debit} = \sum \text{Credit}$.
+2. **Atomic Ledger Posting**: Ledger transactions and all their entries are inserted inside single atomic database transactions.
+3. **Application Immutability**: Posted ledger entries can never be updated or deleted. Corrections are made strictly via compensating contra-reversals.
+4. **Derived Balance Engine**: No authoritative loan balance column is stored. Outstanding principal, interest, penalty, and account balances are derived from active ledger entries on demand.
+
+### 2. Account Sign Conventions
+Normal balances are determined by account type:
+* **Assets & Expenses**: Normal balance is `DEBIT`.
+  $$\text{Balance} = \sum \text{Debits} - \sum \text{Credits}$$
+* **Liabilities, Equity & Income**: Normal balance is `CREDIT`.
+  $$\text{Balance} = \sum \text{Credits} - \sum \text{Debits}$$
+
+### 3. Derived Loan Outstanding Balances
+Calculated by summing entries tagged with the given `loanId`:
+* **Principal Outstanding**: Balance of the loan's *Loans Receivable* account (`assetBalance = Debits - Credits`).
+* **Interest Outstanding**: Balance of the loan's *Interest Receivable* account (`assetBalance = Debits - Credits`).
+* **Penalty Outstanding**: Balance of the loan's *Penalty Receivable* account (`assetBalance = Debits - Credits`).
+* **Total Outstanding**: $\text{Principal} + \text{Interest} + \text{Penalty}$.
+
+### 4. Accounting Operations & Configurable Policy
+* **Disbursement**:
+  * Debit: `LOANS_RECEIVABLE` (Asset)
+  * Credit: `CASH_BANK` (Asset)
+* **Repayment**:
+  * Debit: `CASH_BANK` (Asset)
+  * Credit: `LOANS_RECEIVABLE` (Principal portion)
+  * Credit: `INTEREST_RECEIVABLE` (Accrued interest portion) or `INTEREST_INCOME` (Direct income)
+  * Credit: `PENALTY_RECEIVABLE` (Accrued penalty portion) or `PENALTY_INCOME` (Direct income)
+* **Interest Accrual**:
+  * Debit: `INTEREST_RECEIVABLE` (Asset)
+  * Credit: `INTEREST_INCOME` (Income)
+* **Penalty Accrual**:
+  * Debit: `PENALTY_RECEIVABLE` (Asset)
+  * Credit: `PENALTY_INCOME` (Income)
+
+### 5. Transaction Reversal Mechanics
+* Reversals create a new compensating transaction tagged as `REVERSAL` referencing `reversalOfId`.
+* For every entry in the original transaction, an exact contra-entry is generated (`DEBIT` $\leftrightarrow$ `CREDIT`).
+* Both original and reversal transactions are permanently marked as reversed (`isReversed = true`), guaranteeing idempotent, single-reversal invariants.
+

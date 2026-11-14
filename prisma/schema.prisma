@@ -247,7 +247,11 @@ model LedgerTransaction {
   description     String        @db.Text
   transactionDate DateTime
   posted          Boolean       @default(false)
+  reversalOfId    String?       @unique
   createdAt       DateTime      @default(now())
+
+  reversalOf      LedgerTransaction?  @relation("TransactionReversal", fields: [reversalOfId], references: [id])
+  reversedBy      LedgerTransaction?  @relation("TransactionReversal")
 
   entries         LedgerEntry[]
 
