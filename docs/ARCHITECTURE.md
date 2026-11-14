@@ -329,6 +329,50 @@ Permissions are verified on the backend by centralized `authenticate` and `autho
   * `createdAt`: Immutable ISO 8601 timestamp.
 * **Strict Immutability**: normal application endpoints cannot update or delete audit records (`updateAuditLog` and `deleteAuditLog` throw `ForbiddenError`).
 
+---
+
+## Phase 7: Overdue Interest and Penalty Accrual Engine
+
+### 1. Daily Accrual Financial Policy (ACTUAL/365 Basis)
+* **Documented Basis**: Financial calculations adhere strictly to the `ACTUAL/365` day-count convention.
+* **Annual Divisor**: $10,000 \text{ (bps divisor)} \times 365 = 3,650,000$.
+* **Overdue Interest on Unpaid Principal**:
+  $$\text{Daily Interest (paise)} = \text{roundHalfUp}\left(\frac{\text{unpaidPrincipalPaise} \times \text{interestRateBps}}{3,650,000}\right)$$
+  Calculated exclusively on the remaining unpaid principal of overdue installments, correctly factoring in previous partial payments.
+* **Overdue Penalty on Unpaid Installment Amount**:
+  $$\text{Daily Penalty (paise)} = \text{roundHalfUp}\left(\frac{\text{unpaidInstalmentPaise} \times \text{penaltyRateBps}}{3,650,000}\right)$$
+  Calculated on the total remaining unpaid installment amount ($\text{totalPaise} - (\text{paidPrincipal} + \text{paidInterest})$).
+* **Safe Integer Math**: Zero floating-point operations; half-up rounding implemented via safe `BigInt` arithmetic.
+
+### 2. Configurable Grace Period Engine
+* **Product-Level Configuration**: Each loan product defines `gracePeriodDays` ($\ge 0$).
+* **Overdue Boundary Condition**:
+  $$\text{Grace Cutoff} = \text{dueDate} + \text{gracePeriodDays (days)}$$
+  $$\text{Is Overdue} \iff \text{asOfDate} > \text{Grace Cutoff}$$
+* Installments within the due date or grace period are strictly exempted from daily accruals.
+
+### 3. Database-Enforced Idempotency & Concurrency Safety
+* **Database Unique Constraint**:
+  ```sql
+  UNIQUE INDEX unique_schedule_date_type (scheduleId, accrualDate, accrualType)
+  ```
+  Guarantees at the database engine level that no installment can accrue interest or penalty more than once for any given calendar date.
+* **Row-Level Mutex Locking**:
+  During accrual processing, each target loan is exclusively locked with `SELECT id FROM loans WHERE id = ? FOR UPDATE`, serializing concurrent scheduler executions or simultaneous repayments.
+* **Scheduler Mutex**:
+  The `AccrualScheduler` (`node-cron`) maintains an in-memory execution guard (`isJobExecuting`) preventing overlapping job invocations.
+
+### 4. Balanced Double-Entry Postings
+Every overdue accrual posts balanced ledger entries:
+* **Overdue Interest**:
+  * Debit: `Interest Receivable` (Asset account)
+  * Credit: `Interest Income` (Income account)
+* **Overdue Penalty**:
+  * Debit: `Penalty Receivable` (Asset account)
+  * Credit: `Penalty Income` (Income account)
+Ensures $\sum \text{Debit} \equiv \sum \text{Credit}$ and maintains trial balance integrity across all runs.
+
+
 
 
 

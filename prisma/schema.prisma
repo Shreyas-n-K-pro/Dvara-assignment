@@ -76,6 +76,7 @@ model LoanProduct {
   maxAmountPaise        BigInt             // Maximum loan amount in paise
   penaltyRateBps        Int                @default(0) // Late payment penalty in basis points
   processingFeeBps      Int                @default(0) // Processing fee in basis points
+  gracePeriodDays       Int                @default(0) // Grace period before overdue penalties & interest apply
   isActive              Boolean            @default(true)
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
@@ -153,6 +154,7 @@ model RepaymentSchedule {
 
   loan              Loan                   @relation(fields: [loanId], references: [id], onDelete: Cascade)
   allocations       RepaymentAllocation[]
+  accrualRecords    AccrualRecord[]
 
   @@unique([loanId, installmentNumber])
   @@index([loanId, installmentNumber])
@@ -307,18 +309,29 @@ model IdempotencyKey {
 // ─── ACCRUAL ─────────────────────────────────────────────────────
 
 model AccrualRecord {
-  id            String   @id @default(uuid())
+  id            String             @id @default(uuid())
   loanId        String
-  accrualDate   DateTime @db.Date
-  interestPaise BigInt   // Daily accrued interest in paise
-  createdAt     DateTime @default(now())
+  scheduleId    String?
+  accrualDate   DateTime           @db.Date
+  accrualType   AccrualType        @default(INTEREST)
+  amountPaise   BigInt             @default(0) // Daily accrued amount in paise
+  interestPaise BigInt             @default(0) // Backward-compatible field for Phase 6 manual accrual
+  penaltyPaise  BigInt             @default(0) // Backward-compatible field
+  createdAt     DateTime           @default(now())
 
-  loan          Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  loan          Loan               @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  schedule      RepaymentSchedule? @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
-  @@unique([loanId, accrualDate])
+  @@unique([scheduleId, accrualDate, accrualType], map: "unique_schedule_date_type")
   @@index([loanId])
   @@index([accrualDate])
+  @@index([scheduleId])
   @@map("accrual_records")
+}
+
+enum AccrualType {
+  INTEREST
+  PENALTY
 }
 
 // ─── AUDIT LOG ───────────────────────────────────────────────────

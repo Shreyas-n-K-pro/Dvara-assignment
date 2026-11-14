@@ -251,6 +251,17 @@ The service uses 13 interconnected entities implementing a complete loan lifecyc
 - **Bcrypt Password Protection**: Password hashing via `bcryptjs` (10 rounds); credentials stripped from all outputs.
 - **Append-Only Audit Trail**: Every sensitive operation records an immutable audit log with user ID, before/after snapshots, entity type/id, timestamp, and client IP.
 
+## Overdue Interest & Penalty Accrual (Phase 7)
+
+### Scheduled Daily Engine (`node-cron`)
+- **ACTUAL/365 Basis**: Daily calculations use $10,000 \times 365 = 3,650,000$ basis with strict integer half-up rounding in BigInt paise.
+- **Overdue Daily Interest**: Accrues on the unpaid principal of overdue installments.
+- **Overdue Daily Penalty**: Accrues on the unpaid installment amount according to product `penaltyRateBps`.
+- **Configurable Grace Periods**: Product-level `gracePeriodDays` ensures no penalties or overdue interest accrue during the grace window.
+- **Partial Payments Awareness**: Dynamic deduction of previously allocated payments before calculating accrual bases.
+- **Database-Level Idempotency**: Enforced by unique constraint `UNIQUE (scheduleId, accrualDate, accrualType)`; repeated scheduler runs or process restarts produce zero duplicates.
+- **Thread-Safe Mutex & Row Locks**: Serializes concurrent scheduler executions using `SELECT ... FOR UPDATE` row locks and in-memory execution guards.
+
 ## API Endpoints
 
 ### Available Endpoints
@@ -274,7 +285,12 @@ The service uses 13 interconnected entities implementing a complete loan lifecyc
 | GET | `/api/ledger/accounts` | `MANAGER`, `AUDITOR` | List active ledger accounts |
 | GET | `/api/ledger/trial-balance` | `MANAGER`, `AUDITOR` | Verify trial balance $\sum \text{Debit} \equiv \sum \text{Credit}$ |
 | POST | `/api/ledger/transactions/:id/reverse` | `MANAGER` | Reverse posted transaction via contra entries |
-| POST | `/api/accruals/manual` | `MANAGER` | Trigger manual interest accrual |
+| POST | `/api/accruals/overdue` | `MANAGER` | Protected manual trigger for overdue interest & penalty accrual |
+| POST | `/api/accruals/run` | `MANAGER` | Run daily accrual job for specified `asOfDate` |
+| POST | `/api/accruals/manual` | `MANAGER` | Trigger single loan manual interest accrual |
+| GET | `/api/accruals/scheduler/status` | `MANAGER`, `AUDITOR` | Inspect cron scheduler status and last execution telemetry |
+| POST | `/api/accruals/scheduler/start` | `MANAGER` | Start the background cron scheduler |
+| POST | `/api/accruals/scheduler/stop` | `MANAGER` | Stop the background cron scheduler |
 | GET | `/api/audit-logs` | `MANAGER`, `AUDITOR` | Retrieve append-only audit trail logs |
 
 
