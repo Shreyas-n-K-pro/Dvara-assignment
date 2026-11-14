@@ -27,6 +27,7 @@ import {
   TrialBalanceAccountSummary,
   LedgerTransactionWithEntries,
 } from './types';
+import { defaultAccountingPolicy, AccrualPolicyParams } from './policy';
 import {
   ValidationError,
   NotFoundError,
@@ -219,6 +220,41 @@ export class LedgerService {
       return execute(externalTx);
     }
     return prisma.$transaction(execute);
+  }
+
+  /**
+   * Retrieves a transaction by ID, including its entries and reversal references.
+   */
+  async getTransactionById(
+    id: string,
+    tx?: Prisma.TransactionClient
+  ): Promise<LedgerTransactionWithEntries> {
+    const client = tx ?? prisma;
+    const transaction = await client.ledgerTransaction.findUnique({
+      where: { id },
+      include: {
+        entries: true,
+        reversedBy: true,
+        reversalOf: true,
+      },
+    });
+
+    if (!transaction) {
+      throw new NotFoundError(`Ledger transaction with ID '${id}' not found`);
+    }
+
+    return transaction;
+  }
+
+  /**
+   * Posts an accrual transaction using the default accounting policy.
+   */
+  async postAccrual(
+    params: AccrualPolicyParams,
+    tx?: Prisma.TransactionClient
+  ): Promise<LedgerTransactionWithEntries> {
+    const dto = defaultAccountingPolicy.buildAccrualTransaction(params);
+    return this.postTransaction(dto, tx);
   }
 
   /**

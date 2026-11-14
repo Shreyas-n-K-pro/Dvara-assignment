@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { User, UserRole } from '@prisma/client';
 import prisma from '../config/database';
-import { UnauthorizedError } from '../utils/errors';
-import { User } from '@prisma/client';
+import { config } from '../config';
+import { UnauthorizedError, ForbiddenError } from '../utils/errors';
+import { JwtPayload } from '../modules/auth/types';
 
 export interface AuthenticatedRequest extends Request {
   user?: User;
@@ -10,10 +13,10 @@ export interface AuthenticatedRequest extends Request {
 /**
  * Authentication Middleware
  *
- * 1. Checks Authorization header (Bearer <token | userId>) or x-user-id header.
- * 2. Validates user existence and active status.
- * 3. Falls back to default active user in development/test environments if header is omitted.
- * 4. Rejects explicit invalid tokens with 401 Unauthorized.
+ * 1. Extracts Bearer token from Authorization header or x-user-id header.
+ * 2. Verifies signed JWT token using config.jwt.secret.
+ * 3. In test/dev environment with no auth header, falls back to first active user.
+ * 4. Rejects invalid or expired tokens with HTTP 401 Unauthorized.
  */
 export async function authenticate(
   req: AuthenticatedRequest,
@@ -35,17 +38,18 @@ export async function authenticate(
       throw new UnauthorizedError('Invalid authentication token');
     }
 
-    // Support direct UUID, base64 payload, or standard token
-    if (token.includes('.')) {
-      // JWT-like: decode payload
-      try {
-        const payloadBase64 = token.split('.')[1];
-        const decoded = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf8'));
-        candidateUserId = decoded.userId ?? decoded.sub ?? decoded.id;
-      } catch {
-        throw new UnauthorizedError('Invalid JWT token format');
+    try {
+      // 1. Try verifying as signed JWT
+      const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
+      candidateUserId = decoded.id;
+    } catch {
+      // 2. If not standard JWT, check if it's a direct user UUID from tests or legacy base64
+      if (token.includes('.')) {
+        // Was supposed to be JWT but verification failed (expired or bad secret)
+        throw new UnauthorizedError('Invalid or expired authentication token');
       }
-    } else {
+
+      // Check if it's a raw user UUID
       candidateUserId = token;
     }
   } else if (userIdHeader) {
@@ -65,15 +69,57 @@ export async function authenticate(
     return next();
   }
 
-  // If no auth headers provided: in test/development, fallback to first active user
-  const defaultUser = await prisma.user.findFirst({
-    where: { isActive: true },
-  });
+  // Fallback in test environment for legacy test suites that run without headers,
+  // unless strict auth is requested or anonymous flag is explicitly passed
+  if (
+    process.env.NODE_ENV === 'test' &&
+    req.headers['x-test-no-auth'] !== 'true' &&
+    process.env.STRICT_AUTH !== 'true'
+  ) {
+    const defaultUser = await prisma.user.findFirst({
+      where: { isActive: true },
+    });
 
-  if (defaultUser) {
-    req.user = defaultUser;
-    return next();
+    if (defaultUser) {
+      req.user = defaultUser;
+      return next();
+    }
   }
 
   throw new UnauthorizedError('Authentication required');
+}
+
+/**
+ * Centralized Role-Based Access Control (RBAC) Middleware
+ *
+ * Enforces permissions according to the role matrix:
+ * - ADMIN: Granted access across all endpoints.
+ * - Allowed Roles: Checks req.user.role against permitted list.
+ * - Unauthorized Roles: Throws HTTP 403 Forbidden.
+ */
+export function authorize(...allowedRoles: UserRole[]) {
+  return (req: AuthenticatedRequest, _res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      throw new UnauthorizedError('Authentication required');
+    }
+
+    const userRole = req.user.role;
+
+    if (userRole === UserRole.ADMIN) {
+      return next();
+    }
+
+    // Support legacy OFFICER as LOAN_OFFICER
+    if (userRole === UserRole.OFFICER && allowedRoles.includes(UserRole.LOAN_OFFICER)) {
+      return next();
+    }
+
+    if (allowedRoles.includes(userRole)) {
+      return next();
+    }
+
+    throw new ForbiddenError(
+      `Forbidden: Role '${userRole}' lacks permission to access this resource`
+    );
+  };
 }

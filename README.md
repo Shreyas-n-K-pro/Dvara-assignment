@@ -239,18 +239,43 @@ The service uses 13 interconnected entities implementing a complete loan lifecyc
 5. **Optimistic locking** – Version columns on Loan and RepaymentSchedule
 6. **Prisma interactive transactions** – Atomic multi-table operations
 
+## Authentication, RBAC & Audit Trail (Phase 6)
+
+### Roles & Access Control
+- **`LOAN_OFFICER`**: Create borrowers, submit loan applications, disburse loans, post repayments, inspect loan schedules and balances.
+- **`MANAGER`**: All loan officer capabilities, plus complete ledger access (accounts and trial balance), execute transaction reversals, trigger manual interest accruals, and view system audit logs.
+- **`AUDITOR`**: Read-only oversight across borrowers, loans, schedules, ledger accounts, trial balances, and audit logs. Strictly blocked from financial mutations (HTTP 403 Forbidden).
+
+### Security & Audit Capabilities
+- **JWT Authentication**: Signed JWT tokens (`jsonwebtoken`) with configurable expiration.
+- **Bcrypt Password Protection**: Password hashing via `bcryptjs` (10 rounds); credentials stripped from all outputs.
+- **Append-Only Audit Trail**: Every sensitive operation records an immutable audit log with user ID, before/after snapshots, entity type/id, timestamp, and client IP.
+
 ## API Endpoints
 
 ### Available Endpoints
 
-| Method | Path | Header | Description |
-|--------|------|--------|-------------|
-| GET | `/health` | - | Health check |
-| GET | `/api/v1` | - | API metadata |
-| POST | `/api/repayments` | `Idempotency-Key` (required) | Process loan repayment with waterfall allocation and atomic double-entry ledger posting |
-| GET | `/api/repayments/:id` | - | Retrieve repayment details, schedule allocations, and idempotency status |
-| GET | `/api/loans/:id/balance` | - | Retrieve derived outstanding balances (principal, interest, penalty, total) |
-| GET | `/api/loans/:id/schedule` | - | Retrieve repayment installment schedule with paid and remaining balances |
+| Method | Path | Auth / Role | Description |
+|--------|------|-------------|-------------|
+| GET | `/health` | Public | Health check |
+| GET | `/api/v1` | Public | API metadata |
+| POST | `/api/auth/register` | Public | Register new system user |
+| POST | `/api/auth/login` | Public | Authenticate user and receive JWT token |
+| GET | `/api/auth/me` | Authenticated | Retrieve current user profile |
+| POST | `/api/borrowers` | `LOAN_OFFICER`, `MANAGER` | Create borrower record with audit logging |
+| GET | `/api/borrowers` | `LOAN_OFFICER`, `MANAGER`, `AUDITOR` | List borrower records |
+| POST | `/api/loans` | `LOAN_OFFICER`, `MANAGER` | Create loan application & generate repayment schedule |
+| GET | `/api/loans/:id` | `LOAN_OFFICER`, `MANAGER`, `AUDITOR` | Retrieve loan details and schedule |
+| POST | `/api/loans/:id/disburse` | `LOAN_OFFICER`, `MANAGER` | Disburse loan and post initial ledger entries |
+| GET | `/api/loans/:id/balance` | `LOAN_OFFICER`, `MANAGER`, `AUDITOR` | Retrieve derived ledger balances |
+| GET | `/api/loans/:id/schedule` | `LOAN_OFFICER`, `MANAGER`, `AUDITOR` | Retrieve loan repayment schedule |
+| POST | `/api/repayments` | `LOAN_OFFICER`, `MANAGER` | Process repayment (requires `Idempotency-Key` header) |
+| GET | `/api/repayments/:id` | `LOAN_OFFICER`, `MANAGER`, `AUDITOR` | Retrieve repayment details |
+| GET | `/api/ledger/accounts` | `MANAGER`, `AUDITOR` | List active ledger accounts |
+| GET | `/api/ledger/trial-balance` | `MANAGER`, `AUDITOR` | Verify trial balance $\sum \text{Debit} \equiv \sum \text{Credit}$ |
+| POST | `/api/ledger/transactions/:id/reverse` | `MANAGER` | Reverse posted transaction via contra entries |
+| POST | `/api/accruals/manual` | `MANAGER` | Trigger manual interest accrual |
+| GET | `/api/audit-logs` | `MANAGER`, `AUDITOR` | Retrieve append-only audit trail logs |
 
 
 ## Environment Variables

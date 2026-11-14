@@ -1,2 +1,4 @@
-// Audit module - placeholder for Phase 2+
-export {};
+export * from './types';
+export * from './audit.service';
+export * from './audit.controller';
+export { default as auditRoutes } from './audit.routes';

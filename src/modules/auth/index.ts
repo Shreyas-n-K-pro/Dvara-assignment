@@ -1,2 +1,4 @@
-// Auth module - placeholder for Phase 2+
-export {};
+export * from './types';
+export * from './auth.service';
+export * from './auth.controller';
+export { default as authRoutes } from './auth.routes';

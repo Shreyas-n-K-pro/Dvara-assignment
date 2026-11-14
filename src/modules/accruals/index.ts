@@ -1,2 +1,4 @@
-// Accruals module - placeholder for Phase 2+
-export {};
+export * from './types';
+export * from './accrual.service';
+export * from './accrual.controller';
+export { default as accrualRoutes } from './accrual.routes';

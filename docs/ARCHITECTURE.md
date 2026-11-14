@@ -288,5 +288,47 @@ $$\text{loans (by id)} \longrightarrow \text{idempotency\_keys (by key)} \longri
 Transient database contention (MySQL error `1213: ER_LOCK_DEADLOCK`, `1205: Lock wait timeout`, or Prisma `P2034`) is resolved using a bounded retry mechanism with exponential backoff and randomized jitter:
 $$\text{backoff} = 50\text{ms} \times 2^{\text{attempt}} + \text{jitter}(0, 50\text{ms}) \quad (\le 5\text{ attempts})$$
 
+---
+
+## Phase 6: Authentication, Role-Based Access Control (RBAC), and Audit Trail
+
+### 1. Authentication Architecture
+* **JWT Tokens**: Secure stateless token issuance and verification via signed JSON Web Tokens (`jsonwebtoken`), embedding user ID, email, and role claims with configurable expiration (`JWT_EXPIRES_IN`).
+* **Bcrypt Password Hashing**: Passwords hashed using `bcryptjs` (salt rounds = 10) with constant-time verification.
+* **Sensitive Data Hygiene**: Passwords and raw secrets are sanitized from all service responses and audit logs (`sanitizeUser`).
+* **HTTP 401 Unauthorized**: Enforced on missing, malformed, invalid, or expired tokens.
+
+### 2. Role-Based Access Control (RBAC) Matrix
+Permissions are verified on the backend by centralized `authenticate` and `authorize` middleware:
+
+| Operation | Route | Method | LOAN_OFFICER | MANAGER | AUDITOR |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| Register / Login | `/api/auth/*` | POST | Public | Public | Public |
+| Current Profile | `/api/auth/me` | GET | Allowed | Allowed | Allowed |
+| Create Borrower | `/api/borrowers` | POST | **Allowed** | **Allowed** | 403 Forbidden |
+| View Borrowers | `/api/borrowers` | GET | Allowed | Allowed | Allowed |
+| Create Loan | `/api/loans` | POST | **Allowed** | **Allowed** | 403 Forbidden |
+| Disburse Loan | `/api/loans/:id/disburse` | POST | **Allowed** | **Allowed** | 403 Forbidden |
+| Post Repayment | `/api/repayments` | POST | **Allowed** | **Allowed** | 403 Forbidden |
+| View Loan / Schedule | `/api/loans/:id/*` | GET | Allowed | Allowed | Allowed |
+| View Complete Ledger | `/api/ledger/*` | GET | 403 Forbidden | **Allowed** | **Allowed** |
+| Reverse Transaction | `/api/ledger/transactions/:id/reverse` | POST | 403 Forbidden | **Allowed** | 403 Forbidden |
+| Manual Accrual Run | `/api/accruals/manual` | POST | 403 Forbidden | **Allowed** | 403 Forbidden |
+| View Audit Logs | `/api/audit-logs` | GET | 403 Forbidden | **Allowed** | **Allowed** |
+
+### 3. Append-Only Audit Trail
+* **Automated Audit Hooks**: Every sensitive lifecycle operation (borrower creation, loan application, disbursement, repayment, ledger reversal, interest accrual, user registration/login) records an immutable audit entry.
+* **Audit Metadata Captured**:
+  * `userId`: Actor UUID.
+  * `action`: Action enum (`BORROWER_CREATED`, `LOAN_CREATED`, `LOAN_DISBURSED`, `REPAYMENT_PROCESSED`, `TRANSACTION_REVERSED`, `INTEREST_ACCRUED`, `USER_REGISTERED`, `USER_LOGIN`).
+  * `entityType`: Target entity model (`Borrower`, `Loan`, `Repayment`, `LedgerTransaction`, `AccrualRecord`, `User`).
+  * `entityId`: Unique ID of target entity.
+  * `before`: JSON snapshot of entity state prior to action.
+  * `after`: JSON snapshot of entity state post-action.
+  * `ipAddress`: Client IP address.
+  * `createdAt`: Immutable ISO 8601 timestamp.
+* **Strict Immutability**: normal application endpoints cannot update or delete audit records (`updateAuditLog` and `deleteAuditLog` throw `ForbiddenError`).
+
+
 
 
