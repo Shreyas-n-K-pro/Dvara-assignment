@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Architecture & Interview Walkthrough - Dvara Task 8</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-body: #0d0f12;
+      --bg-surface: #16181d;
+      --bg-card: #1c1f26;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      
+      --text-primary: #f3f4f6;
+      --text-secondary: #9ca3af;
+      --text-dim: #6b7280;
+      
+      /* Diagram Specific Palette matching screenshot */
+      --node-grey-bg: #272a30;
+      --node-grey-border: #3b3f47;
+      --node-grey-text: #e5e7eb;
+      
+      --node-purple-bg: #2b2654;
+      --node-purple-border: #4f46e5;
+      --node-purple-text: #e0e7ff;
+      
+      --node-green-bg: #064e3b;
+      --node-green-border: #10b981;
+      --node-green-text: #ecfdf5;
+      
+      --accent-cyan: #38bdf8;
+      --accent-amber: #f59e0b;
+      --accent-emerald: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-body);
+      color: var(--text-primary);
+      line-height: 1.7;
+      padding: 40px 24px 100px;
+    }
+
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    /* HEADER */
+    .header-section {
+      text-align: center;
+      margin-bottom: 56px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .badge-pill {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      background: rgba(79, 70, 229, 0.18);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      margin-bottom: 16px;
+    }
+
+    .main-title {
+      font-size: 2.6rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, #ffffff 40%, #9ca3af 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .main-subtitle {
+      font-size: 1.15rem;
+      color: var(--text-secondary);
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    /* SECTION HEADERS */
+    .section-block {
+      margin-bottom: 64px;
+    }
+
+    .section-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .step-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-cyan);
+      font-weight: 800;
+      font-size: 1.05rem;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .section-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    /* PROBLEM STATEMENT CARD */
+    .problem-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      padding: 36px;
+      margin-bottom: 48px;
+      box-shadow: 0 20px 40px -15px rgba(0,0,0,0.5);
+    }
+
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    .problem-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 24px;
+      border-top: 3px solid var(--accent-amber);
+    }
+
+    .problem-box.solution {
+      border-top-color: var(--accent-emerald);
+    }
+
+    .problem-box h4 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .problem-box p {
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ARCHITECTURE DIAGRAM CONTAINER */
+    .diagram-card {
+      background: #111317;
+      border: 1px solid var(--border-strong);
+      border-radius: 24px;
+      padding: 48px 36px;
+      margin-bottom: 48px;
+      box-shadow: 0 30px 60px -20px rgba(0,0,0,0.7);
+    }
+
+    .diagram-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* DIAGRAM ROWS */
+    .dia-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      width: 100%;
+    }
+
+    .dia-row.space-between {
+      justify-content: space-between;
+    }
+
+    /* DIAGRAM NODES */
+    .dia-node {
+      border-radius: 14px;
+      padding: 16px 20px;
+      text-align: center;
+      min-width: 150px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      cursor: pointer;
+    }
+
+    .dia-node:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.5);
+    }
+
+    .dia-node-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .dia-node-sub {
+      font-size: 0.8rem;
+      opacity: 0.75;
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* THEME: GREY */
+    .node-grey {
+      background: var(--node-grey-bg);
+      border: 1px solid var(--node-grey-border);
+      color: var(--node-grey-text);
+    }
+
+    /* THEME: PURPLE */
+    .node-purple {
+      background: var(--node-purple-bg);
+      border: 1px solid var(--node-purple-border);
+      color: var(--node-purple-text);
+      flex: 1;
+    }
+
+    /* THEME: GREEN (ATOMIC CORE) */
+    .node-green-pill {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      color: #f8fafc;
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* DIAGRAM GROUPS (CONTAINERS) */
+    .dia-group {
+      width: 100%;
+      border-radius: 18px;
+      border: 1px dashed var(--border-strong);
+      padding: 24px 28px;
+      position: relative;
+    }
+
+    .dia-group-label {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #e5e7eb;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* PRISMA ATOMIC CORE CONTAINER */
+    .prisma-container {
+      width: 100%;
+      background: var(--node-green-bg);
+      border: 1.5px solid var(--node-green-border);
+      border-radius: 18px;
+      padding: 26px 28px;
+      box-shadow: 0 12px 30px rgba(16, 185, 129, 0.15);
+    }
+
+    .prisma-header {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #a7f3d0;
+      margin-bottom: 18px;
+    }
+
+    .prisma-flow {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .flow-arrow-h {
+      color: #34d399;
+      font-weight: 800;
+      font-size: 1.2rem;
+    }
+
+    .prisma-footer {
+      text-align: center;
+      font-size: 0.86rem;
+      color: #6ee7b7;
+      margin-top: 18px;
+      font-weight: 500;
+    }
+
+    /* VERTICAL ARROWS */
+    .arrow-down {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 24px;
+      color: var(--text-dim);
+      font-size: 1.2rem;
+    }
+
+    /* LEGEND */
+    .legend-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 36px;
+      margin-top: 28px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .legend-box {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+    }
+
+    /* DETAILED FLOW EXPLANATION CARDS */
+    .flow-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      padding: 32px;
+      margin-bottom: 24px;
+      transition: border-color 0.25s, transform 0.25s;
+    }
+
+    .flow-card:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .flow-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .flow-badge {
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: 'Fira Code', monospace;
+    }
+
+    .flow-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .flow-content {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.75;
+    }
+
+    .speech-bubble {
+      background: rgba(30, 41, 59, 0.7);
+      border-left: 4px solid var(--accent-cyan);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+      margin-top: 18px;
+      font-size: 0.94rem;
+      color: #e2e8f0;
+      font-style: italic;
+    }
+
+    .speech-bubble strong {
+      font-style: normal;
+      color: var(--accent-cyan);
+    }
+
+    /* SCRIPT FOR INTERVIEW */
+    .interview-script-card {
+      background: linear-gradient(145deg, #181d26, #12151b);
+      border: 1.5px solid rgba(99, 102, 241, 0.4);
+      border-radius: 20px;
+      padding: 40px;
+      margin-top: 48px;
+    }
+
+    .interview-script-card h3 {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #a5b4fc;
+      margin-bottom: 16px;
+    }
+
+    .script-step {
+      margin-bottom: 24px;
+      padding-left: 20px;
+      border-left: 2px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .script-step:last-child {
+      margin-bottom: 0;
+    }
+
+    .script-step h5 {
+      font-size: 1.02rem;
+      color: #f3f4f6;
+      margin-bottom: 6px;
+    }
+
+    .script-step p {
+      font-size: 0.94rem;
+      color: #cbd5e1;
+      line-height: 1.65;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 860px) {
+      .diagram-card {
+        padding: 24px 16px;
+      }
+      .dia-row {
+        flex-wrap: wrap;
+      }
+      .prisma-flow {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .flow-arrow-h {
+        transform: rotate(90deg);
+        text-align: center;
+        margin: 6px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- HEADER -->
+    <header class="header-section">
+      <span class="badge-pill">Technical Interview Masterclass</span>
+      <h1 class="main-title">Loan & Double-Entry Ledger Service Architecture</h1>
+      <p class="main-subtitle">
+        A spacious, step-by-step visual map and interview explanation script designed to help you explain your entire system with clarity, confidence, and authority.
+      </p>
+    </header>
+
+    <!-- 1. PROBLEM STATEMENT -->
+    <section class="section-block">
+      <div class="section-title-wrap">
+        <span class="step-number">1</span>
+        <h2 class="section-title">The Real-World Problem We Set Out to Solve</h2>
+      </div>
+      
+      <div class="problem-card">
+        <p style="font-size: 1.05rem; color: var(--text-primary); margin-bottom: 16px;">
+          Most simple web applications handle money using a naive database column: <code>UPDATE accounts SET balance = balance - 500</code>.
+          In financial microfinance, this causes three catastrophic problems:
+        </p>
+
+        <div class="problem-grid">
+          <div class="problem-box">
+            <h4 style="color: #f87171;">⚠️ 1. Floating-Point Rounding Leakage</h4>
+            <p>
+              JavaScript and databases use IEEE-754 floats where <code>0.1 + 0.2 = 0.30000000000000004</code>.
+              Over 100,000 micro-loan repayments, fractions of a paisa drift, causing severe regulatory audit discrepancies.
+            </p>
+          </div>
+
+          <div class="problem-box">
+            <h4 style="color: #f87171;">⚠️ 2. The "Ghost Balance" Drift</h4>
+            <p>
+              If a balance column is stored separately from audit records, a partial crash or manual admin edit causes the stored balance to permanently diverge from transaction history with no mathematical proof.
+            </p>
+          </div>
+
+          <div class="problem-box">
+            <h4 style="color: #f87171;">⚠️ 3. Concurrent Double-Dipping Race</h4>
+            <p>
+              If a borrower owes ₹10,000 and hits "Pay ₹6,000" in two browser tabs at the same time, two concurrent threads read ₹10,000, both succeed, and the borrower pays ₹12,000, creating negative principal.
+            </p>
+          </div>
+        </div>
+
+        <div class="problem-box solution" style="margin-top: 24px;">
+          <h4 style="color: #34d399;">✅ How Our Architecture Eliminates All Three</h4>
+          <p>
+            We represent money strictly in <strong>pure integer BigInt paise</strong> (zero float error).
+            We maintain <strong>zero stored balance columns</strong> (all balances are derived from an immutable double-entry ledger).
+            And we wrap repayments in an atomic <strong>Prisma transaction with MySQL pessimistic row locking (<code>SELECT FOR UPDATE</code>)</strong>, serializing concurrent payments and guaranteeing idempotency.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. THE ARCHITECTURE DIAGRAM -->
+    <section class="section-block">
+      <div class="section-title-wrap">
+        <span class="step-number">2</span>
+        <h2 class="section-title">Visual Architecture Diagram</h2>
+      </div>
+
+      <div class="diagram-card">
+        <div class="diagram-wrapper">
+          
+          <!-- TOP ROW: INGESTION & TRIGGER ACTORS -->
+          <div class="dia-row space-between">
+            <div class="dia-node node-grey" style="min-width: 200px;">
+              <div class="dia-node-title">Replay engine</div>
+              <div class="dia-node-sub">8 workers</div>
+            </div>
+
+            <div class="dia-node node-grey" style="min-width: 200px;">
+              <div class="dia-node-title">Users, Postman</div>
+              <div class="dia-node-sub">3 roles</div>
+            </div>
+
+            <div class="dia-node node-grey" style="min-width: 200px;">
+              <div class="dia-node-title">Daily cron</div>
+              <div class="dia-node-sub">node-cron</div>
+            </div>
+          </div>
+
+          <div class="arrow-down">↓</div>
+
+          <!-- LEVEL 2: EXPRESS API GATEWAY -->
+          <div class="dia-group">
+            <div class="dia-group-label">Express API gate</div>
+            <div class="dia-row">
+              <div class="dia-node node-purple">
+                <div class="dia-node-title">JWT auth</div>
+                <div class="dia-node-sub">401 if invalid</div>
+              </div>
+              <div class="dia-node node-purple">
+                <div class="dia-node-title">Role check</div>
+                <div class="dia-node-sub">403 if denied</div>
+              </div>
+              <div class="dia-node node-purple">
+                <div class="dia-node-title">Error handler</div>
+                <div class="dia-node-sub">400, 404, 409</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="arrow-down">↓</div>
+
+          <!-- LEVEL 3: DOMAIN LOGIC MODULES -->
+          <div class="dia-row">
+            <div class="dia-node node-purple">
+              <div class="dia-node-title">Loans</div>
+              <div class="dia-node-sub">+ schedules</div>
+            </div>
+            <div class="dia-node node-purple">
+              <div class="dia-node-title">Repayments</div>
+              <div class="dia-node-sub">waterfall</div>
+            </div>
+            <div class="dia-node node-purple">
+              <div class="dia-node-title">Ledger</div>
+              <div class="dia-node-sub">double-entry</div>
+            </div>
+            <div class="dia-node node-purple">
+              <div class="dia-node-title">Audit</div>
+              <div class="dia-node-sub">trail</div>
+            </div>
+            <div class="dia-node node-purple">
+              <div class="dia-node-title">Accruals</div>
+              <div class="dia-node-sub">interest, fees</div>
+            </div>
+          </div>
+
+          <div class="arrow-down">↓</div>
+
+          <!-- LEVEL 4: PRISMA TRANSACTION (ATOMIC CORE) -->
+          <div class="prisma-container">
+            <div class="prisma-header">Prisma transaction: all writes atomic</div>
+            <div class="prisma-flow">
+              <div class="node-green-pill">Check key</div>
+              <div class="flow-arrow-h">→</div>
+              <div class="node-green-pill">Lock loan</div>
+              <div class="flow-arrow-h">→</div>
+              <div class="node-green-pill">Get balance</div>
+              <div class="flow-arrow-h">→</div>
+              <div class="node-green-pill">Waterfall</div>
+              <div class="flow-arrow-h">→</div>
+              <div class="node-green-pill">Post ledger</div>
+            </div>
+            <div class="prisma-footer">Any failure rolls back every step</div>
+          </div>
+
+          <div class="arrow-down">↓</div>
+
+          <!-- LEVEL 5: MYSQL 8 DATABASE STORAGE -->
+          <div class="dia-group">
+            <div class="dia-group-label">MySQL 8 (InnoDB)</div>
+            <div class="dia-row">
+              <div class="dia-node node-grey" style="flex:1;">
+                <div class="dia-node-title">Loan tables</div>
+              </div>
+              <div class="dia-node node-grey" style="flex:1;">
+                <div class="dia-node-title">Repayments</div>
+                <div class="dia-node-sub">+ keys</div>
+              </div>
+              <div class="dia-node node-grey" style="flex:1;">
+                <div class="dia-node-title">Ledger</div>
+              </div>
+              <div class="dia-node node-grey" style="flex:1;">
+                <div class="dia-node-title">Audit log</div>
+              </div>
+              <div class="dia-node node-grey" style="flex:1;">
+                <div class="dia-node-title">Accrual log</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="arrow-down">↓</div>
+
+          <!-- LEVEL 6: DATA SYNTHESIS & RECONCILIATION -->
+          <div class="dia-row space-between">
+            <div class="dia-node node-grey" style="min-width: 220px;">
+              <div class="dia-node-title">Data generator</div>
+              <div class="dia-node-sub">seed 42</div>
+            </div>
+
+            <div class="dia-node node-grey" style="min-width: 220px;">
+              <div class="dia-node-title">Verify ledger</div>
+              <div class="dia-node-sub">9 checks</div>
+            </div>
+
+            <div class="dia-node node-grey" style="min-width: 220px;">
+              <div class="dia-node-title">Report files</div>
+              <div class="dia-node-sub">0 paise diff</div>
+            </div>
+          </div>
+
+          <!-- COLOR LEGEND -->
+          <div class="legend-row">
+            <div class="legend-item">
+              <div class="legend-box" style="background: var(--node-grey-bg); border: 1px solid var(--node-grey-border);"></div>
+              <span>Outside and data</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-box" style="background: var(--node-purple-bg); border: 1px solid var(--node-purple-border);"></div>
+              <span>App logic</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-box" style="background: var(--node-green-bg); border: 1px solid var(--node-green-border);"></div>
+              <span>Atomic core</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. CONNECTING THE POINTS: SIMPLE EXPLANATION -->
+    <section class="section-block">
+      <div class="section-title-wrap">
+        <span class="step-number">3</span>
+        <h2 class="section-title">Connecting Each Point in the Flow</h2>
+      </div>
+
+      <!-- Point 1 -->
+      <div class="flow-card">
+        <div class="flow-header">
+          <span class="flow-badge" style="background: rgba(156, 163, 175, 0.2); color: #e5e7eb;">POINT 1</span>
+          <h3 class="flow-title">Who is Calling the System? (The Ingestion Layer)</h3>
+        </div>
+        <div class="flow-content">
+          Requests enter from three distinct sources at the top of the diagram:
+          <ul style="margin: 8px 0 0 20px;">
+            <li><strong>Users / Postman:</strong> Human operators interacting via our REST API across 3 segregated roles (<code>LOAN_OFFICER</code>, <code>MANAGER</code>, and <code>AUDITOR</code>).</li>
+            <li><strong>Daily cron:</strong> A <code>node-cron</code> scheduled job that fires automatically at midnight to trigger daily overdue interest and penalty accruals.</li>
+            <li><strong>Replay engine:</strong> A multi-threaded test client running 8 concurrent workers replaying 5,000 synthetic events to benchmark real-world performance.</li>
+          </ul>
+        </div>
+        <div class="speech-bubble">
+          <strong>How to say this to the interviewer:</strong> "Requests originate from three places: external loan officers and managers via REST API, a background midnight cron for daily interest accruals, and an 8-worker replay harness we built to stress-test concurrent payments."
+        </div>
+      </div>
+
+      <!-- Point 2 -->
+      <div class="flow-card">
+        <div class="flow-header">
+          <span class="flow-badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc;">POINT 2</span>
+          <h3 class="flow-title">The Express API Gate: Security & Error Guardrails</h3>
+        </div>
+        <div class="flow-content">
+          Before touching any business logic, every HTTP request passes through three strict middleware filters:
+          <ul style="margin: 8px 0 0 20px;">
+            <li><strong>JWT auth:</strong> Verifies the HMAC-SHA256 bearer token. Rejects invalid or expired credentials with <strong>HTTP 401 Unauthorized</strong>.</li>
+            <li><strong>Role check:</strong> Enforces Segregation of Duties. For instance, loan officers cannot approve loans or inspect trial balances. Rejects unauthorized attempts with <strong>HTTP 403 Forbidden</strong>.</li>
+            <li><strong>Error handler:</strong> Translates typed exceptions into clean RFC-compliant JSON responses (e.g., 400 for bad amounts, 404 for missing loans, 409 for idempotency payload conflicts).</li>
+          </ul>
+        </div>
+        <div class="speech-bubble">
+          <strong>How to say this to the interviewer:</strong> "Our API gate ensures zero unauthorized access. It checks JWT validity, enforces role-based access control, and sanitizes all errors so sensitive database traces never leak to the client."
+        </div>
+      </div>
+
+      <!-- Point 3 -->
+      <div class="flow-card">
+        <div class="flow-header">
+          <span class="flow-badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc;">POINT 3</span>
+          <h3 class="flow-title">The Domain Services (App Logic)</h3>
+        </div>
+        <div class="flow-content">
+          Once cleared, requests reach their dedicated business service:
+          <ul style="margin: 8px 0 0 20px;">
+            <li><strong>Loans + schedules:</strong> Computes flat-rate or reducing-balance EMI amortization schedules using exact integer math in paise.</li>
+            <li><strong>Repayments:</strong> Orchestrates the waterfall payment allocation across overdue penalties, interest, and principal.</li>
+            <li><strong>Ledger:</strong> Enforces double-entry balance: \(\sum \text{Debits} == \sum \text{Credits}\) across all journal entries.</li>
+            <li><strong>Audit trail:</strong> Captures before/after JSON diffs of every entity change.</li>
+            <li><strong>Accruals:</strong> Calculates daily earned interest on an ACTUAL/365 day-count convention.</li>
+          </ul>
+        </div>
+        <div class="speech-bubble">
+          <strong>How to say this to the interviewer:</strong> "The app logic is divided into modular services. The schedule calculator handles amortization math, repayments manages waterfall collection, and the ledger service acts as the accounting guardian."
+        </div>
+      </div>
+
+      <!-- Point 4 -->
+      <div class="flow-card" style="border-color: rgba(16, 185, 129, 0.4);">
+        <div class="flow-header">
+          <span class="flow-badge" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7;">POINT 4</span>
+          <h3 class="flow-title">The Atomic Core: Prisma Interactive Transaction</h3>
+        </div>
+        <div class="flow-content">
+          This is the green container at the heart of the system. Every repayment executes as an atomic 5-step pipeline:
+          <ol style="margin: 8px 0 0 20px;">
+            <li><strong>Check key:</strong> Inspects the <code>Idempotency-Key</code> header. If already processed with an identical SHA-256 payload hash, returns cached HTTP 200 without touching the database again.</li>
+            <li><strong>Lock loan:</strong> Executes <code>SELECT id FROM loans WHERE id = ? FOR UPDATE</code>. This puts an exclusive database-level row lock on the loan record in MySQL InnoDB. Concurrent threads are forced to wait.</li>
+            <li><strong>Get balance:</strong> Dynamically sums all debits and credits from the ledger to compute the true outstanding balance under lock. Rejects overpayments with HTTP 400.</li>
+            <li><strong>Waterfall:</strong> Allocates incoming funds: overdue penalties first &rarr; due interest second &rarr; principal third.</li>
+            <li><strong>Post ledger:</strong> Creates balanced double-entry legs (e.g. Debit Cash ₹1,000 / Credit Principal ₹800 / Credit Interest ₹200).</li>
+          </ol>
+          <p style="margin-top: 10px; color: #a7f3d0; font-weight: 600;">
+            Guaranteed invariant: <em>Any failure at any step immediately rolls back the entire transaction. Zero half-baked state can ever persist.</em>
+          </p>
+        </div>
+        <div class="speech-bubble">
+          <strong>How to say this to the interviewer:</strong> "This green box is where financial integrity is guaranteed. Inside a single Prisma transaction, we check idempotency, lock the loan row with SELECT FOR UPDATE to prevent race conditions, derive fresh balance under lock, execute the waterfall, and write balanced ledger entries. If anything fails, MySQL rolls back every single step."
+        </div>
+      </div>
+
+      <!-- Point 5 -->
+      <div class="flow-card">
+        <div class="flow-header">
+          <span class="flow-badge" style="background: rgba(156, 163, 175, 0.2); color: #e5e7eb;">POINT 5</span>
+          <h3 class="flow-title">MySQL 8 Storage & The Verification Loop</h3>
+        </div>
+        <div class="flow-content">
+          All changes commit to MySQL InnoDB across 5 normalized storage groups: <code>Loan tables</code>, <code>Repayments + keys</code>, <code>Ledger</code>, <code>Audit log</code>, and <code>Accrual log</code>.
+          <br><br>
+          At the bottom of the diagram is our <strong>Offline Verification Loop</strong>:
+          <ul style="margin: 8px 0 0 20px;">
+            <li><strong>Data generator (seed 42):</strong> Deterministically created 5,000 synthetic events (valid payments, network retry keys, conflict keys, overpayments).</li>
+            <li><strong>Replay engine:</strong> Hammered the live API with 8 concurrent workers at <strong>179.4 req/s</strong>.</li>
+            <li><strong>Verify ledger (9 checks):</strong> An automated audit script verified 9 mathematical invariants against MySQL.</li>
+            <li><strong>Report files:</strong> Proved that Total Debits equal Total Credits with <strong>exactly 0 paise difference</strong> across ₹4.21 Crore of ledger entries.</li>
+          </ul>
+        </div>
+        <div class="speech-bubble">
+          <strong>How to say this to the interviewer:</strong> "Finally, everything is persisted to MySQL 8. To prove this architecture works under real production stress, we generated 5,000 synthetic events with seed 42, replayed them across 8 workers at 179 req/s with 0 server errors, and ran an automated verification script that confirmed a global trial balance difference of exactly 0 paise."
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. READY-TO-USE INTERVIEW SCRIPT -->
+    <section class="section-block">
+      <div class="interview-script-card">
+        <h3>🎙️ The 2-Minute Interview Walkthrough Script</h3>
+        <p style="color: #cbd5e1; margin-bottom: 24px;">
+          Practice reading this verbatim. It moves logically from top to bottom through the diagram in under 2 minutes:
+        </p>
+
+        <div class="script-step">
+          <h5>"1. Where requests come from..."</h5>
+          <p>"Looking at the top of the architecture diagram, requests enter from three sources: operational users like loan officers and managers via REST API, a scheduled midnight cron for daily interest accruals, and an 8-worker replay harness we built for load testing."</p>
+        </div>
+
+        <div class="script-step">
+          <h5>"2. The gateway security..."</h5>
+          <p>"All HTTP traffic hits our Express API Gate. Here, JWT middleware validates the token, RBAC checks enforce Segregation of Duties—for example, preventing loan officers from approving loans—and our centralized error handler ensures clean, standardized error responses."</p>
+        </div>
+
+        <div class="script-step">
+          <h5>"3. The business modules..."</h5>
+          <p>"Requests are then routed to their respective domain services: Loans manages schedules, Repayments manages payment collection, Ledger enforces double-entry rules, and Accruals calculates daily interest on an ACTUAL/365 basis."</p>
+        </div>
+
+        <div class="script-step">
+          <h5>"4. The atomic core (The most critical part)..."</h5>
+          <p>"The centerpiece of the architecture is the green box: our atomic Prisma transaction. When a payment arrives, we first check the idempotency key using SHA-256 request hashing. We then place an exclusive row lock on the loan using MySQL's <code>SELECT FOR UPDATE</code>. Under this lock, we derive the remaining balance, run our waterfall allocation—penalties first, then interest, then principal—and post balanced debits and credits to the double-entry ledger. If any step fails, MySQL rolls back the entire transaction."</p>
+        </div>
+
+        <div class="script-step">
+          <h5>"5. Production verification..."</h5>
+          <p>"Finally, at the bottom, we proved the correctness of this design by generating 5,000 synthetic events, replaying them with 8 workers at 179 requests per second with zero 500 errors, and verifying with our reconciliation script that our global trial balance had a net difference of exactly 0 paise."</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+</body>
+</html>
